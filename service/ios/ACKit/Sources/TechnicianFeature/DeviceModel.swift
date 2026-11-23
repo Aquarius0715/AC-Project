@@ -142,8 +142,9 @@ public final class DeviceModel {
     public func calibrate() async {
         guard let sensor = device.value?.sensors.first(where: { $0.id == sensorId }) else { return }
         var errors: [String: String] = [:]
-        let reference = Double(reference.trimmingCharacters(in: .whitespaces))
-        let measured = Double(measured.trimmingCharacters(in: .whitespaces))
+        // Double also reads "nan" and "inf", which JSON cannot carry
+        let reference = Double(reference.trimmingCharacters(in: .whitespaces)).flatMap { $0.isFinite ? $0 : nil }
+        let measured = Double(measured.trimmingCharacters(in: .whitespaces)).flatMap { $0.isFinite ? $0 : nil }
         if reference == nil { errors["referenceValue"] = tr("Not valid") }
         if measured == nil { errors["measuredValue"] = tr("Not valid") }
         fieldErrors = errors
@@ -172,7 +173,8 @@ public final class DeviceModel {
     public func bind() async {
         guard let target = rebindTargets.first(where: { $0.id == bindUnitId }) else { return }
         let reason = bindReason.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard (1...1000).contains(reason.count) else {
+        // the Core API counts code points (utf8.RuneCountInString), not the characters on screen
+        guard (1...1000).contains(reason.unicodeScalars.count) else {
             fieldErrors = ["reason": tr("1–1000 characters")]
             return
         }
@@ -187,7 +189,7 @@ public final class DeviceModel {
     /// Adds a response note to an event (its version); the device's physical state does not change.
     public func addNote(to event: DeviceWords.EventRow) async {
         let text = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard (1...1000).contains(text.count) else {
+        guard (1...1000).contains(text.unicodeScalars.count) else {
             fieldErrors = ["responseNote": tr("1–1000 characters")]
             return
         }
