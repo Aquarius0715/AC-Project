@@ -418,6 +418,35 @@ private func candidate(
         #expect(write.url?.path() == "/v1/alerts/a1/acknowledge" && write.value(forHTTPHeaderField: "X-Expected-Version") == "1")
     }
 
+    @Test func anotherAlertCannotBeChosenWhileAStepIsSent() async throws {
+        var acknowledged = alert("a1", status: .acknowledged)
+        acknowledged.acknowledgedAt = "2026-09-27T04:59:00Z"
+        let other = alert("a2", status: .resolved)
+        let gate = Gate(after: 7)
+        let transport = StubTransport(
+            try reads([alert("a1"), other]) + [try answer(acknowledged)] + (try reads([acknowledged, other])),
+            gate: gate
+        )
+        let client = CoreClient(
+            baseURL: URL(string: "http://core.test") ?? URL(filePath: "/"),
+            transport: transport,
+            credentials: FixedCredentials()
+        )
+        let model = AlertsModel(unitId: "u1", jobId: "j1", alertId: nil, client: client)
+        await model.load()
+        let sent = Task { await model.acknowledge() }
+        await gate.until()
+        #expect(model.isSending)
+        await model.select("a2")
+        #expect(model.selected?.id == "a1", "the alert being sent stays shown")
+        await gate.open()
+        await sent.value
+        // the note belongs to the alert it was sent for
+        #expect(model.selected?.id == "a1" && model.selected?.status == .acknowledged && model.note == "Acknowledged")
+        await model.select("a2")
+        #expect(model.selected?.id == "a2" && model.note == nil, "once sent, another alert is chosen as before")
+    }
+
     @Test func aResolutionIsCheckedThenSentWithItsEvidence() async throws {
         var resolved = alert("a1", status: .resolved)
         resolved.resolvedAt = "2026-09-27T04:59:00Z"

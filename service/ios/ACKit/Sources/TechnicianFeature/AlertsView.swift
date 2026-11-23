@@ -78,6 +78,7 @@ struct AlertsView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .foregroundStyle(.primary)
                     }
+                    .disabled(model.isSending)
                     .accessibilityIdentifier("alerts.choice.\(choice.id)")
                     .accessibilityAddTraits(choice.id == model.selected?.id ? .isSelected : [])
                 }

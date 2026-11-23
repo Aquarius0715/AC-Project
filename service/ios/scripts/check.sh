@@ -31,6 +31,22 @@ if [ "$part" = ui ]; then
   schemes=${2:?"check.sh ui <scheme> [k/n]"}
   shard=${3:-}
 fi
+# one of n groups of an app's tests (k/n): its test methods in file order, every n-th from the k-th
+only=""
+if [ -n "$shard" ]; then
+  # a malformed group would pass no -only-testing option, that is run every test under a group's name
+  printf '%s\n' "$shard" | grep -qxE '[1-9][0-9]*/[1-9][0-9]*' && [ "${shard%/*}" -le "${shard#*/}" ] ||
+    { echo "check.sh ui: the group is k/n with 1 <= k <= n, not $shard" >&2; exit 2; }
+  k=${shard%/*}
+  n=${shard#*/}
+  target=$(echo "$schemes" | sed 's/App$//')UITests
+  # the groups are read from the one test file: a test in another file of the target would be in no group
+  files=$(find "$target" -name '*.swift' | wc -l | tr -d ' ')
+  [ "$files" = 1 ] || { echo "check.sh ui: $target has $files Swift files; the groups read only $target/$target.swift" >&2; exit 2; }
+  only=$(grep -o 'func test[A-Za-z0-9]*' "$target/$target.swift" | sed 's/func //' |
+    awk -v k="$k" -v n="$n" -v t="$target" '(NR - 1) % n == k - 1 { printf "-only-testing:%s/%s/%s ", t, t, $0 }')
+  [ -n "$only" ] || { echo "check.sh ui: group $shard of $target has no tests" >&2; exit 2; }
+fi
 step "UI tests (stub)"
 .tools/xcodegen/xcodegen/bin/xcodegen generate --spec project.yml --quiet
 # the first available iPhone simulator of the installed runtimes (the runner's and a Mac's differ) that Xcode also offers
@@ -53,15 +69,6 @@ trap 'rm -f "$log"' EXIT
 # each app's result bundle (screenshots, the screen recording, the element tree of a failure) is kept in results/, which
 # CI uploads when a test fails: a runner's iOS may differ from this Mac's, and its log says only which check failed
 rm -rf results && mkdir -p results
-# one of n groups of an app's tests (k/n): its test methods in file order, every n-th from the k-th
-only=""
-if [ -n "$shard" ]; then
-  k=${shard%/*}
-  n=${shard#*/}
-  target=$(echo "$schemes" | sed 's/App$//')UITests
-  only=$(grep -o 'func test[A-Za-z0-9]*' "$target/$target.swift" | sed 's/func //' |
-    awk -v k="$k" -v n="$n" -v t="$target" '(NR - 1) % n == k - 1 { printf "-only-testing:%s/%s/%s ", t, t, $0 }')
-fi
 for scheme in $schemes; do
   # shellcheck disable=SC2086 # the -only-testing options are split on purpose
   if ! xcodebuild -project AC.xcodeproj -scheme "$scheme" -destination "platform=iOS Simulator,id=$device_id" test $only \

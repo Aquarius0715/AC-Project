@@ -280,6 +280,16 @@ final class TechnicianUITests: XCTestCase {
         app.tabBars.buttons["Devices"].firstMatch.tap()
         let row = app.buttons["device.d1"]
         XCTAssertTrue(row.waitForExistence(timeout: 5))
+        // the chosen filter is told to VoiceOver, not only by its style (the web's aria-pressed)
+        let all = app.buttons["All"].firstMatch
+        let online = app.buttons["Online"].firstMatch
+        XCTAssertTrue(all.isSelected, "the filter All is chosen at first")
+        XCTAssertFalse(online.isSelected)
+        online.tap()
+        XCTAssertTrue(online.isSelected, "the filter Online is chosen")
+        XCTAssertFalse(all.isSelected)
+        all.tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
         try app.audit()
         row.tap()
         let check = app.buttons["device.check"]
@@ -463,7 +473,11 @@ final class TechnicianUITests: XCTestCase {
         let confirm = app.buttons["report.submit.confirm"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
         confirm.tap()
-        XCTAssertTrue(wait(for: app.staticTexts["report.note"], label: "Report v1 submitted"))
+        // any version: autosave (20 s after the last edit) may save a draft version first on a slow machine
+        let note = app.staticTexts["report.note"]
+        let isSubmitted = NSPredicate(format: "label MATCHES %@", "Report v[0-9]+ submitted")
+        let submitted = XCTNSPredicateExpectation(predicate: isSubmitted, object: note)
+        XCTAssertEqual(XCTWaiter().wait(for: [submitted], timeout: 15), .completed, "the submit note: \(note.label)")
         keepScreenshot("live-report-submitted", of: app)
     }
 }

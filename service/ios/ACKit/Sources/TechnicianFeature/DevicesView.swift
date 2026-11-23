@@ -21,6 +21,7 @@ struct DevicesView: View {
                         ForEach(DeviceFilter.allCases, id: \.self) { filter in
                             if model.filter == filter {
                                 Button(filter.label) { model.filter = filter }.buttonStyle(.borderedProminent)
+                                    .accessibilityAddTraits(.isSelected)
                             } else {
                                 Button(filter.label) { model.filter = filter }.secondaryAction()
                             }
