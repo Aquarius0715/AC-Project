@@ -188,8 +188,12 @@ final class TechnicianUITests: XCTestCase {
         let confirm = app.buttons["report.submit.confirm"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
         confirm.tap()
-        // the version signed is the one submitted: nothing was saved after the sign-off
-        XCTAssertTrue(wait(for: app.staticTexts["report.note"], label: "Report v1 submitted"))
+        // the version signed is the one submitted: nothing was saved after the sign-off (the sign-off is kept, below); its
+        // number is any, as autosave may have saved a draft version before the save above
+        let note = app.staticTexts["report.note"]
+        let isSubmitted = NSPredicate(format: "label MATCHES %@", "Report v[0-9]+ submitted")
+        let submitted = XCTNSPredicateExpectation(predicate: isSubmitted, object: note)
+        XCTAssertEqual(XCTWaiter().wait(for: [submitted], timeout: 15), .completed, "the submit note: \(note.label)")
         XCTAssertTrue(app.staticTexts["report.signed"].label.hasPrefix("Signed · Ms Tan · "), "the sign-off is kept")
         XCTAssertFalse(submit.exists, "a submitted version is read-only")
         scrollToTop(app)
