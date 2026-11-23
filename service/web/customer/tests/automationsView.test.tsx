@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { consentCard, ruleCard, type ApiAutomation, type ApiOccurrence, type Caps } from "@ac/web/lib/clientAutomations";
 
@@ -27,8 +27,13 @@ vi.mock("@ac/web/lib/useAction", () => ({
 }));
 const patch = vi.hoisted(() => vi.fn());
 vi.mock("@ac/web/lib/useUrlPatch", () => ({ useUrlPatch: () => patch }));
-const preview = vi.hoisted((): { data: ApiOccurrence[] } => ({ data: [] }));
-vi.mock("@ac/web/lib/useOp", () => ({ useOp: () => ({ data: preview.data, loading: false, error: null, source: "api" }) }));
+const preview = vi.hoisted((): { data: ApiOccurrence[]; args: unknown[] } => ({ data: [], args: [] }));
+vi.mock("@ac/web/lib/useOp", () => ({ useOp: (_op: string, args: unknown) => { preview.args.push(args); return { data: preview.data, loading: false, error: null, source: "api" }; } }));
+/** The schedule draft the latest preview asked for. */
+const opDraft = (): unknown => {
+  const last = preview.args.at(-1);
+  return typeof last === "object" && last !== null && "draft" in last ? last.draft : undefined;
+};
 
 import { AutomationsView, type AutomationsLive } from "../app/customer/automations/_components/automations-view";
 
@@ -54,6 +59,7 @@ const ok = <T,>(value: T): Result<T> => ({ ok: true, value });
 beforeEach(() => {
   runs.toasts = [];
   preview.data = [];
+  preview.args = [];
   patch.mockReset();
   actions.saveAutomation.mockReset().mockResolvedValue(ok(schedule));
   actions.deleteAutomation.mockReset().mockResolvedValue(ok({ id: "r-sched", deleted: true }));
@@ -91,6 +97,33 @@ describe("AutomationsView list", () => {
     render(<AutomationsView live={live()} />);
     fireEvent.click(screen.getAllByRole("button", { name: "Edit" })[0] ?? document.body);
     expect(patch).toHaveBeenLastCalledWith({ automationId: "r-sched" });
+  });
+
+  it("after a withdrawal the consent card warns, a rule turned off by it says Disabled, one switched off says Off", () => {
+    const withdrawn = { id: "c-1", version: 9, granted: false, grantedAt: null, revokedAt: "2026-09-12T00:00:00Z" };
+    const off = { ...schedule, enabled: false };
+    const turnedOff = { ...arrival, enabled: false, disabledReason: "consent_revoked" as const };
+    render(<AutomationsView live={live({ rules: [off, turnedOff], cards: [ruleCard(off, ac, null, false), ruleCard(turnedOff, ac, null, false)], consent: { version: 9, ...consentCard(withdrawn, 1, 1) } })} />);
+    expect(screen.getByText(/^Withdrawn .+ 1 location automation was turned off/).closest(".rounded-2xl")?.className).toContain("border-warn");
+    expect(screen.getByRole("button", { name: "Grant consent" }).className).toContain("bg-primary "); // the remedy is primary (IR619)
+    const stateOf = (name: string) => within(screen.getByRole("switch", { name }).closest(".text-xs") ?? document.body);
+    expect(stateOf("Switch Weekday pre-cool on").getByText("Off").className).toContain("text-muted-foreground");
+    expect(stateOf("Switch Arrive home on").getByText("Disabled").className).toContain("text-warn");
+    expect(screen.queryByText("presence switch")).toBeNull(); // no presence switch without consent
+  });
+
+  it("cancelling the delete dialog keeps the rule and sends nothing", async () => {
+    render(<AutomationsView live={live()} />);
+    fireEvent.click(screen.getByRole("button", { name: "More for Arrive home" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    expect(within(screen.getByRole("dialog")).getByText(/Location · Arrival at Home\./)).toBeTruthy();
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "More for Arrive home" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    await vi.waitFor(() => { expect(screen.queryByRole("dialog")).toBeNull(); });
+    expect(actions.deleteAutomation).not.toHaveBeenCalled();
   });
 
   it("deletes a rule at its version from its menu and says what still runs", async () => {
@@ -277,6 +310,85 @@ describe("AutomationsView editor", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save automation" }));
     await vi.waitFor(() => { expect(actions.saveAutomation).toHaveBeenCalledOnce(); });
     expect(actions.saveAutomation.mock.calls[0]?.[0]).toMatchObject({ condition: { type: "location", event: "departure" } });
+  });
+
+  it("a new routine rule says why it has no test, and saves the usual time picked", async () => {
+    render(<AutomationsView live={live({ editing: "new" })} />);
+    fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "Evening routine" } });
+    fireEvent.click(screen.getByRole("radio", { name: /^Routine/ }));
+    expect(screen.getByText("A routine runs at its usual time — try it with Demo controls")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Test / Simulate" })).toHaveProperty("disabled", true);
+    const usual = within(screen.getByRole("group", { name: /^Your usual time/ }));
+    fireEvent.change(usual.getByRole("combobox", { name: "Hour" }), { target: { value: "19" } });
+    fireEvent.change(usual.getByRole("combobox", { name: "Minute" }), { target: { value: "30" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save automation" }));
+    await vi.waitFor(() => { expect(actions.saveAutomation).toHaveBeenCalledOnce(); });
+    expect(actions.saveAutomation.mock.calls[0]).toMatchObject([{ kind: "event", condition: { type: "pattern", localTime: "19:30" }, unitIds: [UNIT] }, null]);
+  });
+
+  it("a new weather rule saves the comparison and the temperature typed", async () => {
+    render(<AutomationsView live={live({ editing: "new" })} />);
+    fireEvent.change(screen.getByRole("textbox", { name: "Name" }), { target: { value: "Cold night" } });
+    fireEvent.click(screen.getByRole("radio", { name: /^Weather/ }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Outdoor temperature" }), { target: { value: "lt" } });
+    fireEvent.change(screen.getByRole("textbox", { name: /^°C/ }), { target: { value: "18.5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save automation" }));
+    await vi.waitFor(() => { expect(actions.saveAutomation).toHaveBeenCalledOnce(); });
+    expect(actions.saveAutomation.mock.calls[0]?.[0]).toMatchObject({ condition: { type: "weather", metric: "temperature", operator: "lt", value: 18.5 } });
+  });
+
+  it("saves a rule for the AC chosen, switched off, and says it will not run until switched on", async () => {
+    const study = { id: "u-2", name: "Study AC", path: "Home", property: "Home" };
+    actions.saveAutomation.mockResolvedValue(ok({ ...schedule, enabled: false }));
+    const view = render(<AutomationsView live={live({ editing: "r-sched", acs: [ac, study], caps: { [UNIT]: caps, "u-2": caps } })} />);
+    fireEvent.change(screen.getByRole("combobox", { name: "Target AC" }), { target: { value: "u-2" } });
+    fireEvent.click(screen.getByRole("switch", { name: "Enabled on save" }));
+    expect(screen.getByText("Off on save")).toBeTruthy();
+    expect(screen.getByText("Only after you turn it on — it is saved off")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Save automation" }));
+    await vi.waitFor(() => { expect(patch).toHaveBeenCalledOnce(); });
+    expect(actions.saveAutomation.mock.calls[0]?.[0]).toMatchObject({ enabled: false, unitIds: ["u-2"] });
+    view.rerender(<AutomationsView live={live()} />);
+    expect(screen.getByText("“Weekday pre-cool” saved · off — switch it on to run it. Saving sends no command now.")).toBeTruthy();
+  });
+
+  it("saves from the test result, and Back to edit closes it without saving", async () => {
+    render(<AutomationsView live={live({ editing: "r-loc" })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Test / Simulate" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Back to edit" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Test / Simulate" }));
+    fireEvent.keyDown(await screen.findByRole("dialog"), { key: "Escape" });
+    await vi.waitFor(() => { expect(screen.queryByRole("dialog")).toBeNull(); });
+    expect(actions.saveAutomation).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Test / Simulate" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Save automation" }));
+    await vi.waitFor(() => { expect(actions.saveAutomation.mock.calls).toHaveLength(1); });
+    expect(actions.saveAutomation.mock.calls[0]?.[1]).toBe(5);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("the schedule preview reads the draft only after typing pauses", () => {
+    vi.useFakeTimers();
+    try {
+      render(<AutomationsView live={live({ editing: "r-sched" })} />);
+      const start = within(screen.getByRole("group", { name: /^Start$/ }));
+      fireEvent.change(start.getByRole("combobox", { name: "Hour" }), { target: { value: "07" } });
+      expect(opDraft()).toMatchObject({ startLocal: "18:00" }); // not yet
+      act(() => { vi.advanceTimersByTime(400); });
+      expect(opDraft()).toMatchObject({ startLocal: "07:00" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a saved rule's occupancy condition changes from its select", async () => {
+    render(<AutomationsView live={live({ editing: "r-loc", rules: [schedule, { ...arrival, onlyIf: [{ type: "occupancy", occupied: true }] }] })} />);
+    fireEvent.change(screen.getByDisplayValue("Someone is home"), { target: { value: "no" } });
+    expect(screen.getByDisplayValue("No one is home")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Save automation" }));
+    await vi.waitFor(() => { expect(actions.saveAutomation).toHaveBeenCalledOnce(); });
+    expect(actions.saveAutomation.mock.calls[0]?.[0]).toMatchObject({ onlyIf: [{ type: "occupancy", occupied: false }] });
   });
 
   it("tests a schedule with its preview without calling the Core API", () => {

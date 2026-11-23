@@ -99,5 +99,26 @@ describe("AutomationsDemo", () => {
     }
     expect(toast).toHaveBeenCalledWith("“Weekday pre-cool” removed");
     expect(screen.getByText("No automations yet")).toBeTruthy();
+    // the empty state's own Create opens a new rule, and saving it leaves the empty state
+    const creates = screen.getAllByRole("button", { name: "Create automation" });
+    expect(creates).toHaveLength(2); // the page head's and the empty state's
+    fireEvent.click(creates[1] ?? document.body);
+    expect(within(dialog()).getByText("Create automation")).toBeTruthy();
+    typeIn(/^Name/, "First rule");
+    press("Review");
+    press("Save automation");
+    expect(screen.queryByText("No automations yet")).toBeNull();
+    expect(screen.getByText("1 automations · 1 on · checked again when it runs")).toBeTruthy();
+  });
+
+  it("a schedule rule runs at the hour picked", () => {
+    render(<AutomationsDemo />);
+    fireEvent.click(screen.getByRole("button", { name: "Create automation" }));
+    typeIn(/^Name/, "Morning cool");
+    fireEvent.change(within(dialog()).getByRole("combobox", { name: "Hour" }), { target: { value: "07" } });
+    press("Review");
+    press("Save automation");
+    expect(screen.getByText("Every day at 07:00")).toBeTruthy();
+    expect(screen.getByText("07:00")).toBeTruthy();
   });
 });
