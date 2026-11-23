@@ -27,6 +27,7 @@ public final class ControlModel {
     public private(set) var refusal: String?
     public private(set) var fieldErrors: [String: String] = [:]
     public private(set) var now = Date()
+    private var isClosed = false
     /// The diagnostic command's choice and reason.
     public var actionId = ""
     public var reason = ""
@@ -227,14 +228,19 @@ public final class ControlModel {
         await follow()
     }
 
+    /// The screen was closed: a waiting command or run is no longer followed (a write already on its way still ends).
+    public func close() {
+        isClosed = true
+    }
+
     /// Reads again while a command or the test run waits for the device, until it settles, the polls run out or the
-    /// screen is closed (the view cancels the write's task).
+    /// screen is closed.
     func follow() async {
         var left = Self.polls
         while isActive, left > 0 {
             left -= 1
             await pause(Self.pollInterval)
-            if Task.isCancelled { return }
+            if isClosed { return }
             await load()
         }
     }
@@ -243,6 +249,6 @@ public final class ControlModel {
 /// The wait between polls in the app, off the main actor (as UnitControlModel.sleep).
 public enum UnitControlSleep {
     public static func sleep(_ duration: Duration) async {
-        try? await Task.sleep(for: duration)  // a cancelled wait ends the polls: the screen was closed
+        try? await Task.sleep(for: duration)  // a cancelled wait only ends early; ControlModel.close ends the polls
     }
 }

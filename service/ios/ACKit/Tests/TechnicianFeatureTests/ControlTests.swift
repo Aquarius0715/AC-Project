@@ -422,22 +422,12 @@ private func run(_ state: DiagnosticRunState, failure: CommandFailureCode? = nil
 
     @Test func aClosedScreenStopsFollowing() async throws {
         let waiting = command("c9", status: .sent)
-        let transport = StubTransport((0...ControlModel.polls).flatMap { _ in (try? read(commands: [waiting])) ?? [] })
-        let client = CoreClient(baseURL: URL(filePath: "/"), transport: transport, credentials: FixedCredentials())
-        // the wait is cancelled, as when the screen closes during it
-        let cancel: @Sendable (Duration) async -> Void = { _ in withUnsafeCurrentTask { $0?.cancel() } }
-        let model = ControlModel(
-            unitId: "e841ee95-3171-54d5-be91-1f2301bdb701",
-            jobId: "f0000000-0000-4000-8000-000000000863",
-            client: client,
-            pause: cancel
-        )
-        await Task {
-            await model.load()
-            await model.follow()
-        }.value
+        let (model, transport) = model((0...ControlModel.polls).flatMap { _ in (try? read(commands: [waiting])) ?? [] })
+        await model.load()
+        model.close()
+        await model.follow()
         let requests = await transport.requests
-        #expect(model.isActive && requests.count == 5, "no read after the cancelled wait")
+        #expect(model.isActive && requests.count == 5, "no read after the screen closed")
     }
 
     @Test func theFollowingStopsAfterItsPolls() async throws {
