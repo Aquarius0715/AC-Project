@@ -37,6 +37,10 @@ import Testing
         #expect(form.errors == missing)
         form.reason = String(repeating: "x", count: 1001)
         #expect(form.errors == missing)
+        form.reason = String(repeating: "e\u{301}", count: 600)
+        #expect(form.errors == missing, "600 letters with a combining mark are 1200 code points, as the Core API counts")
+        form.reason = " " + String(repeating: "x", count: 1000) + "\n"
+        #expect(form.errors.isEmpty, "1000 code points after trimming")
         form.reason = "No GPS signal in the basement plant room"
         #expect(form.errors.isEmpty, "a manual check-in needs neither a fix nor a label")
     }
@@ -67,6 +71,8 @@ import Testing
         #expect(form.error == "Tell your coordinator why (1–1000 characters)")
         form.reason = String(repeating: "x", count: 1001)
         #expect(form.error != nil)
+        form.reason = String(repeating: "e\u{301}", count: 600)
+        #expect(form.error != nil, "counted in code points, as the Core API counts")
         form.reason = "Medical appointment"
         #expect(form.error == nil)
     }
@@ -77,11 +83,26 @@ import Testing
         let malaysia = try #require(TimeZone(identifier: "Asia/Kuala_Lumpur"))
         form.date = try #require(Format.parse("2026-12-02T20:00:00Z"))  // 3 Dec, 04:00 in Kuala Lumpur
         form.window = "14:00-16:00"
-        #expect(form.slot(in: malaysia) == Slot(startAt: "2026-12-03T06:00:00Z", endAt: "2026-12-03T08:00:00Z"))
+        #expect(
+            form.slot(in: malaysia, pickedIn: malaysia) == Slot(startAt: "2026-12-03T06:00:00Z", endAt: "2026-12-03T08:00:00Z")
+        )
         form.window = "14:00"
-        #expect(form.slot(in: malaysia) == nil, "a window that is no span")
+        #expect(form.slot(in: malaysia, pickedIn: malaysia) == nil, "a window that is no span")
         form.window = "14-16"
-        #expect(form.slot(in: malaysia) == nil, "a time that is no hour and minute")
+        #expect(form.slot(in: malaysia, pickedIn: malaysia) == nil, "a time that is no hour and minute")
         #expect(CantMakeForm.windows.contains(CantMakeForm().window))
+    }
+
+    @Test func theDayIsTheOneThePickerShowed() throws {
+        // the phone is in Tokyo, the membership shows Kuala Lumpur: 00:30 on 3 Dec in Tokyo is still 2 Dec there
+        let malaysia = try #require(TimeZone(identifier: "Asia/Kuala_Lumpur"))
+        let tokyo = try #require(TimeZone(identifier: "Asia/Tokyo"))
+        var form = CantMakeForm()
+        form.date = try #require(Format.parse("2026-12-02T15:30:00Z"))
+        form.window = "14:00-16:00"
+        #expect(
+            form.slot(in: malaysia, pickedIn: tokyo) == Slot(startAt: "2026-12-03T06:00:00Z", endAt: "2026-12-03T08:00:00Z"),
+            "the day the picker showed (3 Dec), its window in the display time zone"
+        )
     }
 }
