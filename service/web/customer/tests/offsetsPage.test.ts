@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { isValidElement, type ComponentProps } from "react";
-import type { ApiEnergySummary } from "@ac/web/lib/energy";
+import type { ApiBaseline, ApiEnergySummary } from "@ac/web/lib/energy";
 import type { ApiOffsetRecord } from "@ac/web/lib/offsets";
 
 // Carbon offsets of the customer app (FR-C13): the demo outside API mode; the estimate for the selection carried from
@@ -36,6 +36,12 @@ import { RouteError, RouteLoading } from "@ac/web/components/RouteStates";
 
 const NOW = new Date("2026-09-15T01:12:30Z");
 const units = [{ id: "u-b", displayName: "Bedroom AC" }, { id: "u-a", displayName: "Attic AC" }];
+const baseline = (id: string, unitIds: string[]): ApiBaseline => ({
+  id, unitIds, version: 1, createdAt: "2026-09-01T00:00:00Z", period: { from: "2026-08-01T00:00:00Z", to: "2026-08-08T00:00:00Z" }, method: "demo_fixed",
+  baselineKWh: 24, quality: { kind: "measured", coverage: 1 }, boundaryId: "ac_input_electricity", boundary: "AC input", assumptions: "", source: "demo",
+});
+// bl-1 covers both ACs, bl-a only the Attic AC
+const baselines = [baseline("bl-1", ["u-a", "u-b"]), baseline("bl-a", ["u-a"])];
 const summary = (over: Partial<ApiEnergySummary> = {}): ApiEnergySummary => ({
   period: { from: "2026-09-08T16:00:00Z", to: "2026-09-15T01:12:00Z" }, unitIds: ["u-b"],
   totals: { kWh: 20, amountMinor: 1000, savedKWh: 4, deltaKWh: -4, savingPercentage: 16.7, savedAmountMinor: 200, emissionsKg: 10, savedEmissionsKg: 2 },
@@ -59,7 +65,8 @@ beforeEach(() => {
   dal.coreNow.mockResolvedValue(NOW);
   dal.coreDisplay.mockResolvedValue({ locale: "en", timeZone: "Asia/Kuala_Lumpur" });
   const records = [offset("off-1-aaaaaaaa", { demoCertificateRef: "DEMO-CERT-1", retirementRef: "RET-1" }), offset("off-2-bbbbbbbb", { retirementRef: "RET-2" }), offset("off-3-cccccccc")];
-  dal.coreAll.mockImplementation((op: string) => Promise.resolve(op === "units.list" ? units : records));
+  const lists = new Map<string, unknown[]>([["units.list", units], ["baselines.list", baselines]]);
+  dal.coreAll.mockImplementation((op: string) => Promise.resolve(lists.get(op) ?? records));
   dal.coreOp.mockResolvedValue(summary());
 });
 
@@ -111,6 +118,17 @@ describe("offsets page", () => {
     expect(summaryCalls().some((s) => typeof s === "object" && s !== null && "baselineId" in s)).toBe(false);
     expect(live.estimate).toMatchObject({ comparable: false, factor: "emission factor missing" });
     expect(live.back).toBe("unitIds=u-a&period=7d&baselineId=none");
+  });
+
+  it("a baseline that is gone or not for these ACs is left out of the estimate instead of failing the page, and the way back keeps the link", async () => {
+    for (const baselineId of ["bl-deleted", "bl-a"]) {
+      dal.coreOp.mockClear();
+      const live = viewProps(await open({ unitIds: "u-b", baselineId }));
+      expect(summaryCalls()).toMatchObject([{ unitIds: ["u-b"] }]);
+      expect(summaryCalls().some((s) => typeof s === "object" && s !== null && "baselineId" in s)).toBe(false);
+      expect(live.back).toBe(`unitIds=u-b&period=7d&baselineId=${baselineId}`);
+    }
+    expect(dal.coreAll).toHaveBeenCalledWith("baselines.list");
   });
 
   it("a VALIDATION refusal leaves no estimate; any other failure reaches the error boundary", async () => {

@@ -13,11 +13,6 @@ import type { ApiCommand, ApiUnitDetail } from "@ac/web/lib/units";
 import { UnitView, type PolicyOption } from "./_components/unit-view";
 import { orNull } from "@ac/web/lib/promises";
 
-/** A row of policies.list: the kind says which of the two shapes this page reads it is. */
-interface ApiPolicy { id: string; kind: string }
-const isAlert = (p: ApiPolicy): p is ApiAlertPolicy => p.kind === "alert";
-const isDefault = (p: ApiPolicy): p is ApiDefaultPolicy => p.kind === "default_alert";
-
 /** The detail of the unit's active restriction, found as Contracts & payments finds it — the contract with an active
 restriction, one of its invoices, restrictions.forInvoice (the customer has no restriction list) — or null (IR583). */
 async function restrictionHref(unitId: string): Promise<string | null> {
@@ -43,9 +38,10 @@ export default async function CustomerUnitPage({ params }: Readonly<PageProps<"/
     if (error instanceof CoreError && (error.error.code === "NOT_FOUND" || error.error.fieldErrors.id)) notFound();
     throw error;
   }
-  const [room, policies, history, display, restriction, now, me, prefs] = await Promise.all([
+  const [room, alertPolicies, defaultPolicies, history, display, restriction, now, me, prefs] = await Promise.all([
     coreOp<{ items: ApiUnit[] }>("units.list", { limit: 100, filters: detail.spaceId ? { spaceId: detail.spaceId } : { unitIds: [id] } }),
-    coreOp<{ items: ApiPolicy[] }>("policies.list", { limit: 100 }),
+    // every page, as the Alerts screen reads them: a policy attached to this AC past the first 100 still shows
+    coreAll<ApiAlertPolicy>("policies.list", { filters: { kind: "alert" } }), coreAll<ApiDefaultPolicy>("policies.list", { filters: { kind: "default_alert" } }),
     coreOp<{ items: ApiCommand[] }>("commands.list", { unitId: id, query: { limit: 20 } }),
     coreDisplay(),
     detail.effectiveControlPolicy.state === "restricted" ? orNull(restrictionHref(id)) : Promise.resolve(null), // a link only, never a failure
@@ -55,12 +51,11 @@ export default async function CustomerUnitPage({ params }: Readonly<PageProps<"/
   ]);
   const i = i18nOf(display), { t } = i;
   const severity: Record<string, string> = { critical: "Critical", warning: "Warning", normal: "Info" };
-  const options: PolicyOption[] = policies.items
-    .filter(isAlert)
+  const options: PolicyOption[] = alertPolicies
     // in words, as the Alert policies tab says it (IR623): "Room temperature ≥ 30 °C for 10 min → Warning"
     .map((p) => ({ id: p.id, name: p.name, rule: `${conditionText(p, t)} → ${textOf(severity, p.severity, t) ?? p.severity}` }));
   // the default policy's rules on for this customer, as the owner switched them (IR623)
-  const defaultPolicy = policies.items.find(isDefault);
+  const defaultPolicy = defaultPolicies.at(0);
   const defaults = defaultPolicy ? { on: defaultRuleRows(defaultPolicy, me.customerId, me.membershipId, i).on, n: defaultPolicy.rules.length } : null;
   return <UnitView id={id} detail={detail} room={room.items.map((item) => unitRowFromApi(item))} policies={options} defaults={defaults} history={history.items} restrictionHref={restriction} nowMs={now.getTime()} me={me.membershipId} pins={prefs?.pinnedUnitIds ?? []} />;
 }
