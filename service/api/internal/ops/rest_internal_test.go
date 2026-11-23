@@ -484,16 +484,23 @@ func TestRESTBodyRefusals(t *testing.T) {
 	path := map[string]string{fieldJobID: job, fieldTargetKind: "space%20a"}
 
 	for body, wantFE := range map[string]map[string]string{
-		`{"jobId":"` + other + `"}`:     {fieldJobID: apperr.KeyPathMismatch},
-		`{"action":"mark_paid"}`:        {fieldAction: apperr.KeyPathMismatch},
-		`{"target":"unit"}`:             {fieldTargetKind: apperr.KeyPathMismatch},
-		`[1]`:                           {"_": apperr.KeyMalformedInput},
-		`null`:                          {"_": apperr.KeyMalformedInput},
-		`{"a":1} {"b":2}`:               {"_": apperr.KeyMalformedInput},
-		`{"a":1}}`:                      {"_": apperr.KeyMalformedInput},
-		`{"a":1}]`:                      {"_": apperr.KeyMalformedInput},
-		`{"action":"approve"}`:          nil,
-		`{"target":{"kind":"space a"}}`: nil,
+		`{"jobId":"` + other + `"}`: {fieldJobID: apperr.KeyPathMismatch},
+		`{"action":"mark_paid"}`:    {fieldAction: apperr.KeyPathMismatch},
+		`{"target":"unit"}`:         {fieldTargetKind: apperr.KeyPathMismatch},
+		// encoding/json matches names in any case, so a key in another case would set the path's field
+		`{"jobid":"` + other + `"}`:          {fieldJobID: apperr.KeyPathMismatch},
+		`{"JOBID":"` + job + `"}`:            {fieldJobID: apperr.KeyPathMismatch},
+		`{"actioN":"mark_paid"}`:             {fieldAction: apperr.KeyPathMismatch},
+		`{"Target":{"kind":"unit"}}`:         {fieldTargetKind: apperr.KeyPathMismatch},
+		`{"target":{"KIND":"unit"}}`:         {fieldTargetKind: apperr.KeyPathMismatch},
+		`{"jobId":"` + job + `","note":"x"}`: nil,
+		`[1]`:                                {"_": apperr.KeyMalformedInput},
+		`null`:                               {"_": apperr.KeyMalformedInput},
+		`{"a":1} {"b":2}`:                    {"_": apperr.KeyMalformedInput},
+		`{"a":1}}`:                           {"_": apperr.KeyMalformedInput},
+		`{"a":1}]`:                           {"_": apperr.KeyMalformedInput},
+		`{"action":"approve"}`:               nil,
+		`{"target":{"kind":"space a"}}`:      nil,
 	} {
 		if _, fieldErrs := bind(
 			t,
