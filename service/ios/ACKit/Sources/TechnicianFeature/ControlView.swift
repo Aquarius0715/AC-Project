@@ -5,6 +5,8 @@ import SwiftUI
 /// Diagnostic control: the unit's current state, a diagnostic command, a test run and the job's command history.
 struct ControlView: View {
     @State private var model: ControlModel
+    /// The running send or test run with its polls, cancelled when the screen closes.
+    @State private var writing: Task<Void, Never>?
 
     init(model: ControlModel) {
         _model = State(initialValue: model)
@@ -32,6 +34,7 @@ struct ControlView: View {
         .hideTabBar()
         .task { await model.load() }
         .refreshable { await model.load() }
+        .onDisappear { writing?.cancel() }
     }
 
     @ViewBuilder private var cards: some View {
@@ -112,7 +115,7 @@ struct ControlView: View {
             .textFieldStyle(.roundedBorder)
             .accessibilityIdentifier("control.reason")
             if let error = model.fieldErrors["reason"] { Text(verbatim: error).accessibilityIdentifier("control.error.reason") }
-            Button(tr("Review & send")) { Task { await model.send() } }
+            Button(tr("Review & send")) { writing = Task { await model.send() } }
                 .buttonStyle(.borderedProminent)
                 .disabled(model.isSending || model.isActive)
                 .accessibilityIdentifier("control.send")
@@ -143,7 +146,7 @@ struct ControlView: View {
             if let error = model.fieldErrors["runReason"] ?? model.fieldErrors["durationMinutes"] {
                 Text(verbatim: error).accessibilityIdentifier("control.error.run")
             }
-            Button(tr("Test run")) { Task { await model.startRun() } }
+            Button(tr("Test run")) { writing = Task { await model.startRun() } }
                 .buttonStyle(.borderedProminent)
                 .disabled(model.isSending || model.isActive)
                 .accessibilityIdentifier("control.run.submit")

@@ -401,6 +401,45 @@ private func run(_ state: DiagnosticRunState, failure: CommandFailureCode? = nil
         #expect(model.refusal == nil && model.fieldErrors == ["reason": "1–1000 characters"] && model.reason == "Check")
     }
 
+    @Test func theReasonIsCountedAsTheCoreAPICountsIt() {
+        // the Core API trims, then counts code points (utf8.RuneCountInString); "👍🏽" is one character of two
+        #expect(ControlModel.reasonError(String(repeating: "a", count: 1000)) == nil)
+        #expect(ControlModel.reasonError(" " + String(repeating: "a", count: 1000) + "\n") == nil)
+        #expect(ControlModel.reasonError(String(repeating: "a", count: 1001)) != nil)
+        #expect(ControlModel.reasonError(String(repeating: "👍🏽", count: 500)) == nil)
+        #expect(ControlModel.reasonError(String(repeating: "👍🏽", count: 501)) != nil)
+        #expect(ControlModel.reasonError(" \n ") != nil)
+    }
+
+    @Test func aTestRunsRefusedReasonShowsUnderTheRun() async throws {
+        let refused = refusal(422, "VALIDATION", "error.validation", fields: #"{"reason":"error.length"}"#)
+        let (model, _) = model(try read() + [refused] + (try read()))
+        await model.load()
+        model.runReason = "Cooling"
+        await model.startRun()
+        #expect(model.refusal == nil && model.fieldErrors == ["runReason": "1–1000 characters"] && model.runReason == "Cooling")
+    }
+
+    @Test func aClosedScreenStopsFollowing() async throws {
+        let waiting = command("c9", status: .sent)
+        let transport = StubTransport((0...ControlModel.polls).flatMap { _ in (try? read(commands: [waiting])) ?? [] })
+        let client = CoreClient(baseURL: URL(filePath: "/"), transport: transport, credentials: FixedCredentials())
+        // the wait is cancelled, as when the screen closes during it
+        let cancel: @Sendable (Duration) async -> Void = { _ in withUnsafeCurrentTask { $0?.cancel() } }
+        let model = ControlModel(
+            unitId: "e841ee95-3171-54d5-be91-1f2301bdb701",
+            jobId: "f0000000-0000-4000-8000-000000000863",
+            client: client,
+            pause: cancel
+        )
+        await Task {
+            await model.load()
+            await model.follow()
+        }.value
+        let requests = await transport.requests
+        #expect(model.isActive && requests.count == 5, "no read after the cancelled wait")
+    }
+
     @Test func theFollowingStopsAfterItsPolls() async throws {
         let waiting = command("c9", status: .sent)
         let reads = (0...ControlModel.polls).flatMap { _ in (try? read(commands: [waiting])) ?? [] }

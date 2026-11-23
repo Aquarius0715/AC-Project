@@ -149,8 +149,9 @@ public final class ControlModel {
 
     // MARK: - The steps
 
+    /// The reason's length as the Core API counts it: code points after trimming (utf8.RuneCountInString).
     static func reasonError(_ reason: String) -> String? {
-        let count = reason.trimmingCharacters(in: .whitespacesAndNewlines).count
+        let count = reason.trimmingCharacters(in: .whitespacesAndNewlines).unicodeScalars.count
         return count < 1 || count > 1000 ? tr("Reason is required (1–1000 characters)") : nil
     }
 
@@ -186,7 +187,8 @@ public final class ControlModel {
         guard errors.isEmpty else { return }
         let reason = runReason.trimmingCharacters(in: .whitespacesAndNewlines)
         let minutes = Double(minutes)
-        await write { [client, unitId] unit, job throws(CoreError) in
+        // the server names the run's reason "reason": it shows under the run, not under the command (the web's trReason)
+        await write(fields: ["reason": "runReason"]) { [client, unitId] unit, job throws(CoreError) in
             let input = DiagnosticRunsCreateInput(
                 jobId: job.id,
                 unitId: unitId,
@@ -203,7 +205,10 @@ public final class ControlModel {
         if refusal == nil, fieldErrors.isEmpty { runReason = "" }
     }
 
-    private func write(_ send: (UnitDetail, JobDetail) async throws(CoreError) -> String) async {
+    private func write(
+        fields renamed: [String: String] = [:],
+        _ send: (UnitDetail, JobDetail) async throws(CoreError) -> String
+    ) async {
         guard let unit, let job, !isSending else { return }
         isSending = true
         defer { isSending = false }
@@ -214,18 +219,22 @@ public final class ControlModel {
             note = try await send(unit, job)
         } catch {
             refusal = ControlWords.refusal(error.error)
-            fieldErrors = error.error.fieldErrors.mapValues(ControlWords.field)
+            var errors: [String: String] = [:]
+            for (key, value) in error.error.fieldErrors { errors[renamed[key] ?? key] = ControlWords.field(value) }
+            fieldErrors = errors
         }
         await load()
         await follow()
     }
 
-    /// Reads again while a command or the test run waits for the device, until it settles or the polls run out.
+    /// Reads again while a command or the test run waits for the device, until it settles, the polls run out or the
+    /// screen is closed (the view cancels the write's task).
     func follow() async {
         var left = Self.polls
         while isActive, left > 0 {
             left -= 1
             await pause(Self.pollInterval)
+            if Task.isCancelled { return }
             await load()
         }
     }
