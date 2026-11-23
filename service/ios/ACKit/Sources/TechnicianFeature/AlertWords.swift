@@ -261,9 +261,10 @@ public enum AlertWords {
     static let maxEvidence = 20
 
     /// Why the resolution cannot be sent yet, or nil: a reason of 1–1000 characters, and evidence for an alert without a
-    /// policy (IR66).
+    /// policy (IR66). The characters are counted as the Core API counts them, in code points (an emoji with a skin tone
+    /// is two).
     public static func problem(reason: String, picked: [String], policyless: Bool) -> String? {
-        let count = reason.trimmingCharacters(in: .whitespacesAndNewlines).count
+        let count = reason.trimmingCharacters(in: .whitespacesAndNewlines).unicodeScalars.count
         if count < 1 || count > 1000 { return tr("A resolution reason is required (1–1000 characters).") }
         if policyless, picked.isEmpty { return tr("Pick at least one evidence record — this alert has no policy") }
         if picked.count > maxEvidence { return tr("Pick at most {n} evidence records", ["n": String(maxEvidence)]) }

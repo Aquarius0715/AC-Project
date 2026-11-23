@@ -86,14 +86,22 @@ public final class AlertsModel {
         return tr("You can see this AC from {time}, when your work window starts.", ["time": Format.dateTime(start)])
     }
 
+    /// Counts the candidate reads: only the latest one's answer is shown (another alert chosen while a read is out would
+    /// otherwise list the earlier alert's evidence under the later one).
+    private var candidateRead = 0
+
     /// The candidates of an unresolved alert, for a technician who may resolve it.
     private func loadCandidates() async {
+        candidateRead += 1
+        let read = candidateRead
         guard let alert = selected, alert.status != .resolved, canResolve else {
             candidates = nil
             return
         }
         let input = AlertsEvidenceInput(alertId: alert.id, query: Query(limit: 100))
-        candidates = try? await client.call(Ops.AlertsEvidence.self, input).data.items
+        let items = try? await client.call(Ops.AlertsEvidence.self, input).data.items
+        guard read == candidateRead else { return }
+        candidates = items
     }
 
     /// Shows another alert of the unit; its resolution starts empty.
@@ -104,6 +112,7 @@ public final class AlertsModel {
         isChecked = false
         refusal = nil
         note = nil
+        candidates = nil
         await loadCandidates()
     }
 
