@@ -716,14 +716,22 @@ func (b *Binding) queryInput(obj map[string]any, query url.Values, fieldErrs map
 	}
 }
 
-// pathInput places the path parameters; an ID that is not a UUID names no resource (NOT_FOUND).
+// pathInput places the path parameters; an ID that is not a UUID names no resource (NOT_FOUND). The router matches
+// the escaped path, and so leaves a parameter escaped, only when net/url kept one (URL.RawPath, as for %2F);
+// otherwise the parameter is already decoded, and decoding it again would read %256D as "m".
 func (b *Binding) pathInput(
 	ectx *echo.Context,
 	obj map[string]any,
 	fieldErrs map[string]string,
 ) error {
 	for _, name := range b.Path {
-		raw, err := url.PathUnescape(ectx.Param(name))
+		raw := ectx.Param(name)
+
+		var err error
+		if ectx.Request().URL.RawPath != "" {
+			raw, err = url.PathUnescape(raw)
+		}
+
 		if param := b.Params[name]; param.UUID && err == nil && raw != "" {
 			_, perr := uuid.Parse(
 				raw,
