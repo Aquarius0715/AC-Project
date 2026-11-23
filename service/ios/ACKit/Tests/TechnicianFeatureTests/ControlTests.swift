@@ -401,6 +401,35 @@ private func run(_ state: DiagnosticRunState, failure: CommandFailureCode? = nil
         #expect(model.refusal == nil && model.fieldErrors == ["reason": "1–1000 characters"] && model.reason == "Check")
     }
 
+    @Test func theReasonIsCountedAsTheCoreAPICountsIt() {
+        // the Core API trims, then counts code points (utf8.RuneCountInString); "👍🏽" is one character of two
+        #expect(ControlModel.reasonError(String(repeating: "a", count: 1000)) == nil)
+        #expect(ControlModel.reasonError(" " + String(repeating: "a", count: 1000) + "\n") == nil)
+        #expect(ControlModel.reasonError(String(repeating: "a", count: 1001)) != nil)
+        #expect(ControlModel.reasonError(String(repeating: "👍🏽", count: 500)) == nil)
+        #expect(ControlModel.reasonError(String(repeating: "👍🏽", count: 501)) != nil)
+        #expect(ControlModel.reasonError(" \n ") != nil)
+    }
+
+    @Test func aTestRunsRefusedReasonShowsUnderTheRun() async throws {
+        let refused = refusal(422, "VALIDATION", "error.validation", fields: #"{"reason":"error.length"}"#)
+        let (model, _) = model(try read() + [refused] + (try read()))
+        await model.load()
+        model.runReason = "Cooling"
+        await model.startRun()
+        #expect(model.refusal == nil && model.fieldErrors == ["runReason": "1–1000 characters"] && model.runReason == "Cooling")
+    }
+
+    @Test func aClosedScreenStopsFollowing() async throws {
+        let waiting = command("c9", status: .sent)
+        let (model, transport) = model((0...ControlModel.polls).flatMap { _ in (try? read(commands: [waiting])) ?? [] })
+        await model.load()
+        model.close()
+        await model.follow()
+        let requests = await transport.requests
+        #expect(model.isActive && requests.count == 5, "no read after the screen closed")
+    }
+
     @Test func theFollowingStopsAfterItsPolls() async throws {
         let waiting = command("c9", status: .sent)
         let reads = (0...ControlModel.polls).flatMap { _ in (try? read(commands: [waiting])) ?? [] }

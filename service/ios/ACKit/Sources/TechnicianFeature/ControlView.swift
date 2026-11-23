@@ -32,6 +32,7 @@ struct ControlView: View {
         .hideTabBar()
         .task { await model.load() }
         .refreshable { await model.load() }
+        .onDisappear { model.close() }
     }
 
     @ViewBuilder private var cards: some View {
