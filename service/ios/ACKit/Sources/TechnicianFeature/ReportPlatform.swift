@@ -6,7 +6,7 @@ import SwiftUI
 import PencilKit
 import UIKit
 
-/// A photo for the report as JPEG (the library's may be HEIC): at most 2048 points on its long side, so it stays under
+/// A photo for the report as JPEG (the library's may be HEIC): at most 2048 pixels on its long side, so it stays under
 /// the Core API's 5 MiB.
 enum PhotoEncoding {
     static func jpeg(_ data: Data, name: String) -> NewPhoto? {
@@ -15,10 +15,18 @@ enum PhotoEncoding {
     }
 
     static func jpeg(_ image: UIImage, name: String) -> NewPhoto? {
-        let longest = max(image.size.width, image.size.height)
+        let width = image.size.width * image.scale
+        let height = image.size.height * image.scale
+        let longest = max(width, height)
         let scale = longest > 2048 ? 2048 / longest : 1
-        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-        let resized = UIGraphicsImageRenderer(size: size).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
+        let size = CGSize(width: width * scale, height: height * scale)
+        // one pixel per point: the default format draws at the screen's scale (3 on most iPhones), which would make a
+        // 2048-point photo 6144 pixels wide and its JPEG larger than the Core API's 5 MiB
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let resized = UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: size))
+        }
         guard let data = resized.jpegData(compressionQuality: 0.8) else { return nil }
         let base = (name as NSString).deletingPathExtension
         return NewPhoto(name: "\(base.isEmpty ? "photo" : base).jpg", mime: .imageJpeg, data: data)
