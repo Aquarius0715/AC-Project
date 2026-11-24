@@ -11122,6 +11122,7 @@ Found while writing the admin Overview tests (coverage loop round 3, PR #677). W
 A dispatcher who scoped the Overview to Demo Customer A, saw "Unresolved alerts 1" and opened it got every customer's alerts. DD-A01 step 7 and the Overview's own note ("The links keep the customer and property") say these links carry the scope. The alerts, billing and energy screens all read `customerId` and `propertyId`.
 
 1. **Links.** `overviewLinks` adds the scope to `alerts`, `billing` and `energy`, as it does for units and jobs. The period stays out of all three: alerts and unpaid invoices are current, and billing and energy take their periods as Kuala Lumpur months and local times, not the Overview's instants.
+   Energy's analysis tab took only the customer for its default unit set. With a property in the URL and no unit set or baseline, it now starts on that property's units, the ones the Overview's Energy KPI counts.
 2. **Docs.** DD-A01 step 7 lists the three links with their keys.
-3. **Tests.** `adminSummary.test.ts` checks the three links with no scope, a customer, and a customer and property with a period.
+3. **Tests.** `adminSummary.test.ts` checks the three links with no scope, a customer, and a customer and property with a period. `admin/tests/energyScope.test.ts` checks the analysis tab's default units for a customer and for a property.
 
