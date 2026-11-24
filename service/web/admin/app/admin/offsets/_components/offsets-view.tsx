@@ -9,8 +9,8 @@ import { Badge, Banner, Btn, Card, Check, DemoBadge, EmptyState, Field, Input, L
 import { useI18n } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
-import { showTime, textOf } from "@ac/web/lib/i18n";
-import { conceptText, kg3, quoteErrors, quoteInput, type ApiQuote, type QuoteDraft, type RecordRow } from "@ac/web/lib/offsets";
+import { showTime } from "@ac/web/lib/i18n";
+import { conceptText, kg3, quoteErrors, quoteInput, stateWord, type ApiQuote, type QuoteDraft, type RecordRow } from "@ac/web/lib/offsets";
 import { quoteOffset, requestOffset, retryOffset, simulateOffset } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 import { DateTimeSelect } from "@ac/web/components/TimeSelect";
@@ -21,10 +21,9 @@ interface Live {
   /** the record filters of the URL (IR324) and whether the URL's recordId is outside them */
   scope: { customerId?: string; status?: RecordRow["state"]; created: "7d" | "30d" | "90d" | "all" }; recordMissing: boolean;
 }
-// a record's tone by its state (a request still open warns) and the words of the states
+// a record's tone by its state (a request still open warns)
 const STATE_TONE = new Map<RecordRow["state"], Tone>([["demo_retired", "ok"], ["failed", "crit"], [DEMO_PURCHASED, "primary"]]);
 const tone = (s: RecordRow["state"]): Tone => STATE_TONE.get(s) ?? "warn";
-const STATE_WORD: Record<string, string> = { demo_requested: "Demo requested", demo_purchased: "Demo purchased", demo_retired: DEMO_RETIRED, failed: "Failed" };
 const blank: QuoteDraft = { customerId: "", unitIds: [], from: "", to: "", purpose: "", amountKg: "" };
 
 /** The offset demo registry (FR-A15) in API mode: records come from the server; quotes, requests and the simulated
@@ -52,11 +51,12 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
     if (Object.keys(errors).length > 0) return;
     run(() => quoteOffset(quoteInput(d)), t("Demo quote ready — valid for 15 minutes"), setQuote);
   };
-  const request = () => { if (quote && confirmed) run(() => requestOffset(quote.id, quote.version), t("Demo request recorded"), (id) => { close(); setD(blank); nav({ recordId: id }); }); };
+  // Request (demo) exists only beside a quote, so it takes that quote
+  const request = (q: ApiQuote) => { run(() => requestOffset(q.id, q.version), t("Demo request recorded"), (id) => { close(); setD(blank); nav({ recordId: id }); }); };
   const done = { purchase_confirm: t("Demo purchase confirmed"), retire: t(DEMO_RETIRED), fail: t("Failure recorded — the previous stage is kept") };
-  const current = sel?.current; // the attempt the demo steps act on
-  const step = (event: "purchase_confirm" | "retire" | "fail") => { if (sel && current) run(() => simulateOffset(sel.id, sel.version, current.id, event), done[event], () => { setAck(false); }); };
-  const retry = () => { if (sel && current) run(() => retryOffset(sel.id, sel.version, current.id), t("Retry started — a new attempt"), () => { setAck(false); }); };
+  const current = sel?.current ?? null; // the attempt the demo steps act on
+  // the demo step of the selected record's current attempt; the step buttons show only when there is one
+  const step = sel && current ? (event: "purchase_confirm" | "retire" | "fail") => { run(() => simulateOffset(sel.id, sel.version, current.id, event), done[event], () => { setAck(false); }); } : null;
   return (
     <Page>
       <Banner tone="warn" action={<DemoBadge />}>{t("Demo only — quotes, purchases and retirements are simulated. No real credit, certificate, balance or market is involved.")}</Banner>
@@ -71,7 +71,7 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
         <div className="flex flex-wrap items-end gap-3">
           <span className="pb-2 text-xs font-semibold text-muted-foreground">{t("Filter")}</span>
           <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => { nav({ customerId: e.target.value || null, recordId: null }); }}><option value="">{t("All customers")}</option>{live.customers.toSorted(byName).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
-          <Field label={t("Status")}><Select value={live.scope.status ?? ""} onChange={(e) => { nav({ status: e.target.value || null, recordId: null }); }}><option value="">{t("All statuses")}</option>{(["demo_requested", DEMO_PURCHASED, "demo_retired", "failed"] as const).map((x) => <option key={x} value={x}>{textOf(STATE_WORD, x, t) ?? x}</option>)}</Select></Field>
+          <Field label={t("Status")}><Select value={live.scope.status ?? ""} onChange={(e) => { nav({ status: e.target.value || null, recordId: null }); }}><option value="">{t("All statuses")}</option>{(["demo_requested", DEMO_PURCHASED, "demo_retired", "failed"] as const).map((x) => <option key={x} value={x}>{stateWord(x, t)}</option>)}</Select></Field>
           <Field label={t("Created")}><Select value={live.scope.created} onChange={(e) => { nav({ created: e.target.value === "30d" ? null : e.target.value, recordId: null }); }}><option value="7d">{t("Last 7 days")}</option><option value="30d">{t("Last 30 days")}</option><option value="90d">{t("Last 90 days")}</option><option value="all">{t("All time")}</option></Select></Field>
         </div>
         <div className="split-rev">
@@ -84,7 +84,7 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
             <div className="flex min-w-0 flex-col gap-4">
               <Card title={t("Record {id}", { id: sel.id.slice(0, 8) })} sub={t("{customer} · quote {quote} · version {v}", { customer: sel.customer, quote: sel.r.quoteId.slice(0, 8), v: sel.version })}>
                 {sel.stage >= 0 ? <Steps steps={[t("Quoted"), t("Demo requested"), t("Demo purchased"), t(DEMO_RETIRED)]} current={sel.stage} /> : (
-                  <Banner tone="crit" action={live.canWrite && sel.current && <Btn size="sm" disabled={pending} onClick={retry}>{t("Retry")}</Btn>}>{t("{next}. A retry starts a new attempt of the failed stage.", { next: sel.next })}</Banner>
+                  <Banner tone="crit" action={live.canWrite && current && <Btn size="sm" disabled={pending} onClick={() => { run(() => retryOffset(sel.id, sel.version, current.id), t("Retry started — a new attempt"), () => { setAck(false); }); }}>{t("Retry")}</Btn>}>{t("{next}. A retry starts a new attempt of the failed stage.", { next: sel.next })}</Banner>
                 )}
                 <div className="mt-4"><SummaryList items={[
                   [t("Simulated purchase"), t("{amount} — retires as a whole in 1A", { amount: sel.amount })], [t("Provider / scheme"), t("Not selected · demo")],
@@ -93,10 +93,10 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
                   [t("Demo certificate"), sel.r.demoCertificateRef ? t("{ref} (demo — not a real certificate)", { ref: sel.r.demoCertificateRef }) : t("Shown only after the demo retirement (DEMO-…)")],
                 ]} /></div>
               </Card>
-              {live.canWrite && sel.state === "demo_requested" && sel.current && (
+              {live.canWrite && sel.state === "demo_requested" && step && (
                 <Card title={t("Next step · demo purchase")}><div className="flex flex-wrap gap-2"><Btn variant="primary" disabled={pending} onClick={() => { step("purchase_confirm"); }}>{t("Confirm simulated purchase")}</Btn><Btn disabled={pending} onClick={() => { step("fail"); }}>{t("Simulate a failure")}</Btn></div></Card>
               )}
-              {live.canWrite && sel.state === DEMO_PURCHASED && sel.current && (
+              {live.canWrite && sel.state === DEMO_PURCHASED && step && (
                 <Card title={t("Next step · demo retirement")}>
                   <Check label={t("I understand this is a demo retirement. It does not retire a real credit.")} checked={ack} onChange={setAck} />
                   <p className="my-1 text-[11px] text-muted-foreground">{t("Disabled until confirmed. Retiring before the purchase is not possible.")}</p>
@@ -111,7 +111,7 @@ export function OffsetsView({ live }: Readonly<{ live: Live }>) {
         </div>
         </>
       )}
-      <Modal open={modal} onClose={close} title={t("New demo quote")} wide footer={<><Btn onClick={close}>{t("Cancel")}</Btn>{quote ? <Btn variant="primary" disabled={pending || !confirmed} onClick={request}>{t("Request (demo)")}</Btn> : <Btn variant="primary" disabled={pending} onClick={getQuote}>{t("Get demo quote")}</Btn>}</>}>
+      <Modal open={modal} onClose={close} title={t("New demo quote")} wide footer={<><Btn onClick={close}>{t("Cancel")}</Btn>{quote ? <Btn variant="primary" disabled={pending || !confirmed} onClick={() => { request(quote); }}>{t("Request (demo)")}</Btn> : <Btn variant="primary" disabled={pending} onClick={getQuote}>{t("Get demo quote")}</Btn>}</>}>
         <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
           <Field label={t("Customer")} error={tried ? errors.customerId : undefined}><Select value={d.customerId} onChange={(e) => { set({ customerId: e.target.value, unitIds: [] }); }}><option value="">{t("Select…")}</option>{live.customers.toSorted(byName).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
           <Field label={t("Amount (kgCO₂e)")} error={tried ? errors.amountKg : undefined}><Input type="number" min="0" step="0.001" value={d.amountKg} onChange={(e) => { set({ amountKg: e.target.value }); }} /></Field>
