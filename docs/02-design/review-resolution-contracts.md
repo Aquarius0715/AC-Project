@@ -11091,3 +11091,24 @@ The evidence text IR844 writes ("Device <serial> stopped reporting | lost power 
    - A sign-in that succeeds keeps the account's e-mail address (the `email` claim) in a sealed, httpOnly cookie `ac_login_hint_<role>` on `/bff/auth`, for 30 days; sign-out keeps it. Every sign-in start sends it as `login_hint`, so the form is filled in with this app's last account. A single sign-on that is still open answers with its own account instead, as before.
    - Consequence: signing in to one app with another account ends the other app's account at the identity provider, so that app asks for a sign-in once its access token needs refreshing. This was already so with the change-account button.
 3. **Tests.** `callbackRole.test.ts`: another role's account on a plain sign-in ends that session and asks for the password, back to `returnTo`; after `reauth` it is the role error; a sign-in remembers its e-mail address, and nothing without the claim. `loginRoute.test.ts`: `login_hint` from the cookie on a plain and a `reauth` start, none for a missing, altered or invalid cookie. E2E `session.e2e.ts` (four apps): with another app's account in the single sign-on, opening the app shows the password form with this app's e-mail address, not the role error.
+
+## IR877 The technician's alert says what to do on site (IR800) — 2026-11-24
+
+Found in the UI/UX loop (UX-73, the technician's "anomaly response" on a phone). tech-external-a opened "Possible open window" on Bedroom AC from the Overview. The alert evidence showed the evidence, the remeasurements and a reason box, but nothing said what to check on site. IR800 gave the customer a next step, and the technician had none. The resolution note also said "Resolve it with a reason below with “Resolve alerts”", while the button reads Resolve alert ("Resolve alerts" is the permission). "no policy" in the banner was a word from HQ's settings.
+
+1. **Next step.** `techAlertNext` (shared/lib/techAlerts.ts) gives the on-site step of an unresolved alert. An inspection record needs nothing. Otherwise the step goes by the cause first, then the type, and a fault comes last.
+   - window_open: check that the windows and doors are closed and that nothing blocks the airflow, and record it in the work report.
+   - insulation_loss: look for gaps around windows, doors and pipe openings, and note them in the work report.
+   - maintenance: clean the filter during the visit. quality: check the ventilation and the sensor, then take a new reading.
+   - tamper: check the cover and the restriction device. restriction_bypass: check that the restriction device has power and is in sight of the AC. reconciliation_required: nothing to do on site.
+   - Anything else is a fault: find the cause and record it in the work report.
+
+   A resolved alert has no step. The texts speak to the person at the AC, not to the room's user (IR800).
+2. **Screen.** The alert banner adds "What to do on site: …" under its title. The resolution note now depends on what the technician may do:
+   - with a policy and alert.resolve: it resolves once a remeasurement holds, or below with a reason;
+   - with a policy and without alert.resolve: a reason needs “Resolve alerts”;
+   - without a policy: a new reading does not resolve it, and once checked it is resolved below with a reason, or a user with “Resolve alerts” is asked.
+
+   The banner reads "{kind} · resolves only with a reason", without "no policy". DD-T07 says so.
+3. **Tests.** `techAlerts.test.ts` checks the step by cause, type and inspection, the fault fallback, no step once resolved, the Malay text, and the three resolution notes. `alertEvidence.test.tsx` checks the line is shown, and not for a resolved alert.
+
