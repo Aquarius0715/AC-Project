@@ -74,6 +74,8 @@ Payment initiate takes invoiceId/method/demoConfirmed; returned Payment.id is th
 
 Transport wait is 10 seconds per attempt. Inject transport faults (UNAVAILABLE/TIMEOUT/RATE_LIMITED/DELAY) and network loss through IR37 demo.trigger. Only read UNAVAILABLE retries automatically: at most two extra attempts after 1 and 2 seconds (33 seconds overall maximum). No automatic retry for TIMEOUT/VALIDATION/authorization errors or writes. RATE_LIMITED accepts integer 1–3600 seconds; invalid/omitted means 30 seconds. Disable same-operation buttons and service acceptance during this period, showing remaining seconds. Reset/role change cancels viewing waits but does not roll back accepted business work.
 
+As built (API mode): the server-side DAL sends each read or write once, without its own timeout or automatic retry; a write carries an `Idempotency-Key` (a new UUID unless the Server Action passes its own) and `X-Expected-Version`, and the Core API answers a repeated key with the stored response (backend Go design §4). A 401 drops the stored session (IR385). The transport waits, fault injection and read retries above belong to the Phase 1A browser demo.
+
 Command acknowledgement requires receivedAt < expiresAt. At now==expiresAt, process expiry first. Event order: reset → permission change → expiry → device response → periodic evaluation → screen subscription notification. Late acknowledgement adds only history and new observations; never change expired to acknowledged. Demo clock controls timers.
 
 ## D05 Device Mutual Exclusion, Registration, and Retirement
@@ -133,6 +135,8 @@ Resolve invoiceId/jobId relationships through authorized Repository access. Mult
 ## D09 Sessions, Language, and Schedules
 
 Session is `userId,membershipId,tenantId,role,permissions,scopeVersion,generation,viewEpoch,issuedAt,expiresAt`. Lifetime is 30 demo-clock minutes; extend only through IR55 demoSession.extend, with a warning 120 seconds before expiry. demo.advanceClock jumps do not consume lifetime; shift expiresAt by the same amount (IR36). At expiry, discard screens/Queries/unsaved drafts/object URLs and go to /login. Accepted Repository business events continue. On signIn, use returnTo if allowed for the current role, otherwise role home. switchMembership explicitly chooses either another Membership of the same demo user or another user through demo-account switching. Check business self-approval by userId.
+
+As built (API mode): the session is the BFF's (IR333, IR382): sealed in the cookie or kept in the session store, 30 minutes idle and extended by each request, at most 12 hours after the sign-in, without a warning or `demoSession.extend`; sign-in and sign-out go through the identity provider (IR790), and `/demo` can expire the app's session (`/login?error=expired`). The browser demo opens the app with Continue and has no session lifetime.
 
 Preferences: locale=en|ms|ja|id, timezone (IANA), currency=MYR fixed read-only. No currency-switch UI. USD contracts display Money.currency=USD without conversion. Only locale/zone are editable. Keep preferences across role changes/logout; reload/reset restores en/Asia/Kuala_Lumpur, sets session=null, and opens login. Cross-tab sync/persistence is outside scope. Always show “This tab only; reload resets data” in the header. Dirty values prompt before normal leave/reload; role change/logout/expiry discards them for protection and notifies the user.
 

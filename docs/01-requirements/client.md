@@ -157,7 +157,7 @@ Design: [DD-C04](../02-design/client.md#dd-c04-details). Assess parent AT-C04 us
 
 - **Entry conditions**: Select automation targets/condition types. Location conditions require purpose-specific consent.
 - **Main flow**: Choose occupancy, arrival/departure, routine, or weather condition → check consent → save action → trigger test events to check matching/nonmatching conditions.
-- **Business rule BR-C05**: Manage location consent only for location_automation; do not record consent merely to use the app (IR102). Phase 1A uses predefined location events only. Routines are demo estimates; collect no real personal behavior history. Missing condition data never counts as a match.
+- **Business rule BR-C05**: Manage location consent only for location_automation; do not record consent merely to use the app (IR102). Phase 1A uses predefined location events only; as built (DEC-109, IR826) API mode sends the device's own position while the automations page is open, and no position is stored. Routines are demo estimates; collect no real personal behavior history. Missing condition data never counts as a match.
 - **Resulting business state**: Withdrawal disables rules with enabled=false, disabledReason=consent_revoked. Regranting does not automatically enable them (IR53). Do not label existing Commands cancelled. Authorized manual actions remain available.
 - **Boundaries/prohibitions**: Cannot enable location conditions without consent. Arrival after withdrawal creates no Command. Missing weather data skips with a reason.
 
