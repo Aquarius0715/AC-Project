@@ -11112,3 +11112,16 @@ Found in the UI/UX loop (UX-73, the technician's "anomaly response" on a phone).
    The banner reads "{kind} · resolves only with a reason", without "no policy". DD-T07 says so.
 3. **Tests.** `techAlerts.test.ts` checks the step by cause, type and inspection, the fault fallback, no step once resolved, the Malay text, and the three resolution notes. `alertEvidence.test.tsx` checks the line is shown, and not for a resolved alert.
 
+## IR878 The Overview's alerts, billing and energy links keep the customer and property — 2026-11-25
+
+Found while writing the admin Overview tests (coverage loop round 3, PR #677). With a customer or property chosen, the KPIs count that scope (`admin.summary`). The links of three of them dropped it:
+- Unresolved alerts → `/admin/alerts?severity=attention`;
+- Overdue billing → `/admin/billing?overdueOnly=true`;
+- Energy → `/admin/energy`.
+
+A dispatcher who scoped the Overview to Demo Customer A, saw "Unresolved alerts 1" and opened it got every customer's alerts. DD-A01 step 7 and the Overview's own note ("The links keep the customer and property") say these links carry the scope. The alerts, billing and energy screens all read `customerId` and `propertyId`.
+
+1. **Links.** `overviewLinks` adds the scope to `alerts`, `billing` and `energy`, as it does for units and jobs. The period stays out of all three: alerts and unpaid invoices are current, and billing and energy take their periods as Kuala Lumpur months and local times, not the Overview's instants.
+2. **Docs.** DD-A01 step 7 lists the three links with their keys.
+3. **Tests.** `adminSummary.test.ts` checks the three links with no scope, a customer, and a customer and property with a period.
+
