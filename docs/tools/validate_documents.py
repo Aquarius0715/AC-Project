@@ -916,7 +916,7 @@ if accepted_sort['status']=='accepted':
         fail('Job query status ranking differs from accepted decision')
     # IR217: the technician device screens read jobs.list only to find the assigned job of each unit (IR94) and show no
     # job list, so they have no job sort; every other screen that reads jobs.list shows the list and sorts it (IR34).
-    job_lookups = {'SCR-T11', 'SCR-T12', 'SCR-P10', 'SCR-T02', 'SCR-P02', 'SCR-P04', 'SCR-T04', 'SCR-A01', 'SCR-A02'}  # 2026-11-24: P02, P04, T04, A01 and A02 read jobs.list as a lookup or a history without a sort control (as built)
+    job_lookups = {'SCR-T11', 'SCR-T12', 'SCR-P10', 'SCR-T02', 'SCR-P02', 'SCR-P04', 'SCR-T04', 'SCR-A01', 'SCR-A02', 'SCR-C09', 'SCR-P01', 'SCR-P06'}  # 2026-11-24: P02, P04, T04, A01, A02, C09, P01 and P06 read jobs.list as a lookup or a history without a sort control (as built)
     job_lookups = job_lookups  # IR218: P10 lists the jobs still in review as rows of the statement table; IR283: T02 reads the technician's jobs on the unit as its history and the control job
     for screen in screens:
         if 'jobs.list' not in screen['operations'].split(';'):
