@@ -89,7 +89,7 @@ Use the following screen states.
 - error: Show a retry button.
 - offline: Show the last update time and why actions are unavailable.
 - stale: Note that the value is old.
-- refreshing: Keep current data visible, show “Refreshing” and aria-busy, and do not return to a skeleton (IR83).
+- refreshing: Keep current data visible, mark it aria-busy, and do not return to a skeleton (IR83). As built the AppShell sets aria-busy on the main area while a navigation is pending, without a “Refreshing” label.
 - work-not-started (before the work window): Show technician jobs as read-only, with the start time and disabled actions (IR76).
 - Rendering exception: The shared ErrorBoundary shows a full-screen error with correlationId, rather than a blank screen (IR44).
 
@@ -163,7 +163,7 @@ When a real API becomes available, keep the interface used by screens and use a 
 
 | Current state | Event and guard (condition) | Next state / display |
 |---|---|---|
-| Not created | Check permissions, capabilities, contract restrictions, and online status before sending | requested / Show “Request accepted.” Do not change confirmed values yet |
+| Not created | Check permissions, capabilities, contract restrictions, and online status before sending | requested / Show that the request was sent (“Request sent”, then “Waiting for device response…”). Do not change confirmed values yet |
 | requested | A delivery event occurs | sent / Show “Waiting for device response” |
 | requested / sent | An explicit failure occurs, or no response arrives before the deadline | failed / expired. Do not copy requested values to confirmed values |
 | sent | A matching success response arrives before the deadline | acknowledged. Update only settings confirmed by the response |
@@ -251,7 +251,7 @@ Make clocks, ID generation, and success/failure results replaceable. Avoid tests
 - Estimated cost is energy × a fictional unit price. If rates vary by time, add the costs for each interval. State when the demo excludes taxes or fixed charges.
 - Emissions [kgCO₂e] are kWh × factor [kgCO₂e/kWh]. The factor's region, year, version, source, and calculation boundary are required. Do not present a fictional factor as an official real value.
 - Reduction is baseline under matching comparison conditions − actual result. Reduction rate is difference ÷ baseline × 100; it is undefined when the baseline is 0. Show negative reductions as increases.
-- coverage is valid sample count ÷ expected sample count. If the expected count is 0, show “Not calculated.” Note quality issues in summaries and reports. Do not fill missing data with 0.
+- coverage is valid sample count ÷ expected sample count. If the expected count is 0, coverage is not calculated (as built the screens show “—”). Note quality issues in summaries and reports. Do not fill missing data with 0.
 - Indoor CO₂ concentration [ppm] is not used in the emissions calculation above. Expected energy savings are not guaranteed values.
 
 ## 8. Interfaces Kept for a Future API

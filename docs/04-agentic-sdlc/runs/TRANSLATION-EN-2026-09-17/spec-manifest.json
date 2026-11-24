@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "a0a5e442d2e68d32011cefd5edb0b70d032fde9217792c511f85f13dfa6c2a40",
+  "spec_baseline_id": "aca78015144f822c042fc1b8a88e9cf99bc1c6b016edeca9f8a004d3114e93d9",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -78,7 +78,7 @@
     },
     {
       "path": "01-requirements/client.md",
-      "sha256": "ce2990c5f20c3dcf2b032d0e3c969ec675c2710e23326c2e3e77d279c025bd34"
+      "sha256": "cf0aff9ad10eef3e25b49860798deb559398044bea00859f9efd600474e716c5"
     },
     {
       "path": "01-requirements/common.md",
@@ -90,7 +90,7 @@
     },
     {
       "path": "01-requirements/technician.md",
-      "sha256": "e53898c07fe0f11ccb1042dc292a056208c3f0f1df79767d4c53d02676628f78"
+      "sha256": "b4bae0c16c7e448ab59138e2707643b476d011ca7ab3f6cd0dd8c5d6deeadbf3"
     },
     {
       "path": "01-requirements/use-case-catalogue.csv",
@@ -98,7 +98,7 @@
     },
     {
       "path": "02-design/admin.md",
-      "sha256": "abb3bd6ce6e6dd55b55fc8bae27ce5217e0b259cd970f41f9be0f2c36f6b9886"
+      "sha256": "1376208b12444cf78d4b1bbb0513880c4b0d346c64df74caef03eea67ee5eef1"
     },
     {
       "path": "02-design/api/swagger.json",
@@ -114,11 +114,11 @@
     },
     {
       "path": "02-design/client.md",
-      "sha256": "19d9e5e474a89bc073a7aabab59587212adbfaa467e7f188a366bd2253b66e14"
+      "sha256": "49739e866826a535d4d0d8fdec2272d6af54866371b5c338c78a69472a2b6f3d"
     },
     {
       "path": "02-design/common.md",
-      "sha256": "3f616c4544c9be9c30e8ad304db666076246093c0d7d8b232730eef2ee0edb1c"
+      "sha256": "268a84ad94fcfc7705502a6f865379369198444b37f40257ac46ab1edf270f8a"
     },
     {
       "path": "02-design/container-design.md",
@@ -126,7 +126,7 @@
     },
     {
       "path": "02-design/contractor.md",
-      "sha256": "4b80f3649b698c06b908995d2629150405b69826ee1c835e433da0c7301d724e"
+      "sha256": "f71bd52ffa9c8a7a5d55c7fe427a849080a57b7fcde3ad42fe854ed7b8493b0a"
     },
     {
       "path": "02-design/database-design.md",
@@ -134,7 +134,7 @@
     },
     {
       "path": "02-design/deterministic-contracts.md",
-      "sha256": "d50be0b44ae311ec74ee83d08893c8c2f5119e2d4e34dd8f6881696d6df0aeed"
+      "sha256": "d86b75a73dc1216b4449f42d65d1a6a7e2740b606aec4f218b4adfb951aca9b9"
     },
     {
       "path": "02-design/device-firmware.ja.md",
@@ -178,11 +178,11 @@
     },
     {
       "path": "02-design/strict-review-contracts.md",
-      "sha256": "9b8f7f977bf5320a1dc4c6f1c6ef85168b4ffa66ed4aff5508651da754cde367"
+      "sha256": "9066bfe12c2a6c8119353d31a23fa0cc15a6fa2435e88ffa58ccd3d4c4d2c09f"
     },
     {
       "path": "02-design/technician.md",
-      "sha256": "81e7d7fad0a041bcf3181251948c9920447db213fff4ea8b5b3d7b10e78f4499"
+      "sha256": "12f10ff506317614e8e32550c3452e50cd0c8f8aadacbb34e105f753200e7a69"
     },
     {
       "path": "02-design/write-version-catalog.csv",
@@ -198,7 +198,7 @@
     },
     {
       "path": "03-uiux/screen-catalog.csv",
-      "sha256": "2003ada5a83d452dd9c76ab23a1ed4b9271bd486e1e340d09cf143d067ec90bf"
+      "sha256": "e1bae282763a2e674ca4f3aa811b2bcb80ce4e91dbf2c36e401dc835e43e2c7c"
     },
     {
       "path": "04-agentic-sdlc/README.md",
