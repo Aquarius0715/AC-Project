@@ -17,7 +17,7 @@ This document defines client (customer) screen features, fields, states, and err
 
 The primary source is the [Original Company Requirements (SRC-06)](../00-prepare/sources/company-requirements-original.txt). Screens, inputs, states, and acceptance criteria follow the requirements reorganized from this source. Inputs are the [Role Requirements](../01-requirements/client.md) and [Common Requirements](../01-requirements/common.md). Read the [Common Detailed Design](common.md) and [UIUX Specification](../03-uiux/UIUXSpecification.md) before designing.
 
-This document designs frontend fields, displays, and mock behavior. Registration, assignment, payment receipt, restrictions, and audit on the screen only change state in shared mock memory (temporary example data). This does not request server implementation or database design.
+This document designs frontend fields, displays, and mock behavior. Registration, assignment, payment receipt, restrictions, and audit on the screen only change state in shared mock memory (temporary example data). This does not request server implementation or database design. As built (IR257) the apps run against the Core API (`DATA_SOURCE=api`): these changes are writes of the Core API, stored in its database with their events and audit ([backend architecture](backend-architecture.md), [database design](database-design.md)); the shared mock memory is the Phase 1A demo mode only.
 
 Always validate route parameters (values in URLs) as untrusted input. “Service name” in the table means an operation in the shared Repository (data service). Rows with the same route describe different functions on one screen. Every row supports loading, empty, error, forbidden, and not-found states. Show retry only for recoverable errors. For forbidden and not-found, follow IR57 and do not show retry.
 
@@ -50,7 +50,7 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 
 1. Check the session and permitted scope. Validate IDs and URL filters against schemas (data format rules).
 2. Read in the route's Server Component through the DAL (API mode) or from the demo fixtures (Phase 1A); pure mappers in `shared/lib` turn the results into display data.
-3. Forms use controlled inputs with a pure validator per form in `shared/lib`; the validators also check unit capabilities and periods, and the Core API checks again. Forms move to React Hook Form with Zod in their DEC-75 phase.
+3. Forms use controlled inputs with a pure validator per form in `shared/lib`; the validators also check unit capabilities and periods, and the Core API checks again. As built no form uses React Hook Form yet; the move named in DEC-75 has not been made.
 4. Immediately before a mutation, check the target version, permissions, and current state. For major actions, show the target and reason in a confirmation view.
 5. Write through the route's Server Action with the row version and an Idempotency-Key; the Core API records the event and audit with a correlation ID, and the route renders again with the latest state (`refresh()`). The Phase 1A demo changes the tab's shared demo store instead.
 6. Keep a pending indicator visible while awaiting a response. Show success, denial, and failure separately. Keep form inputs when submission fails.
@@ -88,7 +88,8 @@ Scope: FR-C01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `units.
    - As built (IR610, DEC-90): while an invoice is overdue, a notice above the tiles names it — or how many are overdue and their total — with Pay now (or View invoices). It also names the restriction the invoice caused and on how many units, with View restriction details, the restriction's own detail as the unit page links it (IR583). A scheduled restriction says when it starts. The notice reads `invoices.list` (overdue), `contracts.list` and `restrictions.forInvoice`, as the payments page does. A member without billing access, or a customer with nothing overdue, sees no notice (Figma Client 01c).
 3. Viewing does not change business state. Keep filters in the URL and restore them on Back.
    - As built (IR816): on a phone (below `sm`), the most severe open warning or fault is a banner under the overdue notice, with its unit and time, “+n more” and View alerts. On a phone the Needs attention tile is the fourth card, two screens down. Wider screens keep the tile in the first row and show no banner.
-4. Queries to update: `units / telemetry / alerts (only on subscribed events)`.
+4. Queries to update: `units / telemetry / alerts`. As built the overview subscribes to nothing: it shows “Updated {time}” with a Live badge that turns Stale two minutes after the page was read, and Refresh reads it again (§6 of the [common design](common.md)).
+   - As built: the unit table groups the units by property and shows the first five of each with “Show all {total}”. Needs attention lists the three most severe open critical and warning alerts of the units shown (critical first, newest first) with “+n more”. The automations card shows three of the units' automations, enabled ones first, with “{on} on · {off} off”. The Unknown tile links to the units that are offline.
    - As built (IR814): ACs pinned on their own pages (“Pin to Overview”, kept with the user's preferences, IR819/IR820) appear first as “Pinned ACs” with place, room temperature and power and connection badges, each with Unpin.
 
 **Boundary cases and failures**: If one unit cannot be measured, count it as unknown rather than normal. Do not include another customer's unit in summaries even if its ID is supplied as a filter.
@@ -162,7 +163,7 @@ Scope: FR-C03 / Main display pattern: **UI-DETAIL**. Service boundary: `units.ge
 
 **Boundary cases and failures**: For demo capability 16–30 degrees in 1-degree steps, reject 15, 31, and 24.5 degrees. Offline units, other customers' units, restriction violations, and late acknowledgements are not successes. Follow IR46 for actions under restrictions and IR47 for connection/power-signal rejection. An offline AC sends nothing; below the disabled controls the screen offers Request repair, a new repair request for the AC (Figma 02h, IR315). As built, the unit page reads every alert policy of the customer (all pages, by kind), so a policy past the first hundred shows under "Alert policies on this AC" and in the Attach dialog.
 
-**Alert policies on this AC (IR108)**: A card lists the default policy (always attached, “n of 6 rules on”, View) and the customer policies attached to the AC (`ACUnit.alertPolicyIds`, details from `policies.list` with `unitId`) with Detach. “+ Attach policy” opens a centered modal listing the customer’s other policies with checkboxes (“Already attached” disabled) and a link to create a new policy in Alerts › Alert policies; saving calls `units.setAlertPolicies` with the full list. ✎ Rename renames the AC (`locations.rename`, kind=unit).
+**Alert policies on this AC (IR108)**: A card lists the default policy (always attached; as built “{n} rules · ventilation (CO₂, PM2.5) + fault causes · Always attached · {on} of {n} rules on”, with no View link) and the customer policies attached to the AC (`ACUnit.alertPolicyIds`, details from `policies.list` with `unitId`) with Detach. “+ Attach policy” opens a centered modal listing the customer’s other policies with checkboxes (“Already attached” disabled) and a link to create a new policy in Alerts › Alert policies; saving calls `units.setAlertPolicies` with the full list. ✎ Rename renames the AC (`locations.rename`, kind=unit).
 
 **Verification**: Check the traceability entries under AT-C03 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -355,7 +356,7 @@ Scope: FR-C08 / Main display pattern: **UI-LIST**. Service boundary: `alerts.lis
 
 **Boundary cases and failures**: Do not show zero alerts after a fetch failure. If the referenced unit is unavailable, show only “Unavailable” without details. As built, a `unitId` in the URL that is not one of the customer's units does not filter the inbox (the Unit select shows "All units"), and a list filtered by unit or severity says "Nothing in this filter." when it is empty.
 
-**Tabs (Figma 06a–06g)**: Alerts (this design) and Alert policies (DD-C15). The Unit filter is a search-select (first 20 units, type to search the rest). Clients never resolve alerts.
+**Tabs (Figma 06a–06g)**: Alerts (this design) and Alert policies (DD-C15). As built the Unit filter is a plain select listing every unit of the customer with its place (“Unit: All units” first). Clients never resolve alerts.
 
 **Verification**: Check the traceability entries under AT-C08 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -382,7 +383,7 @@ Scope: FR-C09 / Main display pattern: **UI-LIST / UI-FORM / UI-DETAIL**. Service
 
 **Steps**
 
-1. Enter unit, maintenance type, symptoms, and 3 preferred times (1st–3rd). Confirm and receive a request number. From the list (tabs My requests / Filter care; status tabs All / Needs your reply / Requested / Scheduled / In progress / Completed / Cancelled; Origin filter), view confirmed schedules, progress, and past reports. Every row and the detail show the Origin badge (Client request / Periodic plan, IR113). Their status badge reads “Scheduled” for a booked visit (offered, accepted and assigned alike), the word of its tab; the row's line says whether the technician is still being booked or has confirmed (IR574).
+1. Enter unit, maintenance type, symptoms, and 3 preferred times (1st–3rd). Confirm and receive a request number. From the list (tabs My requests / Filter care; status tabs All / Needs your reply / Requested / Scheduled / In progress / Completed / Cancelled; Origin filter), view confirmed schedules, progress, and past reports. Every row and the detail show the Origin badge (Client request / Periodic plan, IR113; as built also HQ request for a job HQ raised, such as an approved installation, DEC-107). As built the Needs your reply tab shows only while a proposal waits for the customer, the Origin filter offers All / Client request / Periodic plan (an HQ request shows under All), and the list is sorted by status in business order. Their status badge reads “Scheduled” for a booked visit (offered, accepted and assigned alike), the word of its tab; the row's line says whether the technician is still being booked or has confirmed (IR574).
 2. Apply the following business rules to both reads and actions.
    - Preferred times are not confirmed bookings. HQ books one of them, or proposes another time.
    - “Time proposed” (pending SlotProposal): the detail shows the proposed time, who comes, HQ's message and the reply deadline with **Accept this time** / **Decline…** (`jobs.respondProposal`). Decline asks for a reason, an optional comment and (recommended) 3 new preferred times. A proposal from the service partner is shown the same way (“asks for another time, via HQ”). Accept books the time; the detail then shows the confirmed time and, once the technician has accepted, the technician's name.
@@ -487,7 +488,7 @@ Scope: FR-C12 / Main display pattern: **UI-DETAIL**. Service boundary: `restrict
 2. Apply the following business rules to both reads and actions.
    - Show scheduled restriction, apply request, per-unit result, release request, and released separately.
    - For partial application, show each unit's state. A summary badge must not hide details.
-3. This screen does not change restrictions; it only passes relevant IDs to payment or inquiry actions. Inquiries are accepted in the demo app and are not sent externally.
+3. This screen does not change restrictions; it only passes relevant IDs to payment or inquiry actions. Inquiries are not sent outside the system. As built `inquiries.create` stores the inquiry and gives every HQ membership with billing.write an in-app `inquiry.received` notification (IR95); HQ answers on the billing pages.
 4. Queries to update: `inquiries / inquiry events (only on submission)`.
 
 **Boundary cases and failures**: Do not show released if offline units still have unknown application results. Confirmed non-application under D03 is not_required. Customers cannot override restrictions by changing URLs or calling services directly.
@@ -632,7 +633,7 @@ Scope: FR-C17 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, 
 
 **Steps**
 
-1. Completed jobs show a banner “Confirm & rate” (also on Overview for 7 days). The modal saves with `jobs.rate`; the job shows “Rated n★” and the rating stays editable until editableUntil (7 days).
+1. Completed jobs show a banner “Confirm & rate” for 7 days (as built on Maintenance › My requests only; the Overview shows no rating banner). The modal saves with `jobs.rate`; the job shows “Rated n★” and the rating stays editable until editableUntil (7 days).
 2. ≤ 2★ asks “What went wrong?” and offers Report a problem; `jobs.reportProblem` creates a requested follow-up job (followUpOfJobId) shown as “Under HQ review”. HQ classifies it (DD-A06, `jobs.classifyFollowUp`).
 3. Queries to update: `jobs / summaries`.
 
@@ -734,4 +735,4 @@ Convert condition forms to the Condition type's discriminated union. occupancy i
 
 Additional contracts: every IR in the [Re-review Correction Contracts](review-resolution-contracts.md) applies, the newest included. They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
-Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.
+Apply IR34 to job-list and jobs.list sorting. As built the customer's request list (DD-C09) has no sort control and no URL sort: it reads `jobs.list` sorted by status ascending (business order).

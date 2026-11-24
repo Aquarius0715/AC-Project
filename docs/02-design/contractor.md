@@ -17,7 +17,7 @@ This document defines contractor screen features, fields, states, and errors (ex
 
 The primary source is the [Original Company Requirements (SRC-06)](../00-prepare/sources/company-requirements-original.txt). Screens, inputs, states, and acceptance criteria follow the requirements reorganized from this source. Inputs are the [Role Requirements](../01-requirements/contractor.md) and [Common Requirements](../01-requirements/common.md). Read the [Common Detailed Design](common.md) and [UIUX Specification](../03-uiux/UIUXSpecification.md) before designing.
 
-This document designs frontend fields, displays, and mock behavior. Registration, assignment, payment receipt, restrictions, and audit on the screen only change state in shared mock memory (temporary example data). This does not request server implementation or database design.
+This document designs frontend fields, displays, and mock behavior. Registration, assignment, payment receipt, restrictions, and audit on the screen only change state in shared mock memory (temporary example data). This does not request server implementation or database design. As built (IR257) the apps run against the Core API (`DATA_SOURCE=api`): these changes are writes of the Core API, stored in its database with their events and audit ([backend architecture](backend-architecture.md), [database design](database-design.md)); the shared mock memory is the Phase 1A demo mode only.
 
 Always validate route parameters (values in URLs) as untrusted input. “Service name” in the table means an operation in the shared Repository (data service). Rows with the same route describe different functions on one screen. Every row supports loading, empty, error, forbidden, and not-found states. Show retry only for recoverable errors. For forbidden and not-found, follow IR57 and do not show retry.
 
@@ -41,7 +41,7 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 
 1. Check the session and permitted scope. Validate IDs and URL filters against schemas (data format rules).
 2. Read in the route's Server Component through the DAL (API mode) or from the demo fixtures (Phase 1A); pure mappers in `shared/lib` turn the results into display data.
-3. Forms use controlled inputs with a pure validator per form in `shared/lib`; the validators also check unit capabilities and periods, and the Core API checks again. Forms move to React Hook Form with Zod in their DEC-75 phase.
+3. Forms use controlled inputs with a pure validator per form in `shared/lib`; the validators also check unit capabilities and periods, and the Core API checks again. As built no form uses React Hook Form yet; the move named in DEC-75 has not been made.
 4. Immediately before a mutation, check the target version, permissions, and current state. For major actions, show the target and reason in a confirmation view.
 5. Write through the route's Server Action with the row version and an Idempotency-Key; the Core API records the event and audit with a correlation ID, and the route renders again with the latest state (`refresh()`). The Phase 1A demo changes the tab's shared demo store instead.
 6. Keep a pending indicator visible while awaiting a response. Show success, denial, and failure separately. Keep form inputs when submission fails.
@@ -405,4 +405,4 @@ Additional contracts: every IR in the [Re-review Correction Contracts](review-re
 
 0.15.0: Apply IR30 to DD-P01 unit severity, IR29 to DD-P05 completion time, and IR31 to the ban on self-approval of jointly edited versions.
 
-Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.
+Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. As built the contractor job list offers status and deadline in both directions and unit urgency (most urgent first); the schedule defaults to status and the history to the latest event (DD-P03, DD-P07).
