@@ -490,7 +490,7 @@ services:
 
   mailpit:             # Amazon SES stand-in for development: catches every e-mail (SMTP 1025) and shows it at
                        # http://localhost:8025; nothing leaves the machine (IR418)
-    image: axllent/mailpit:v1.33.1@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce   # pinned (IR373)
+    image: axllent/mailpit:v1.34.0@sha256:23a2ef85bc50853ab3093645d1d64679afd8887e89da5e48a88940c172591a4e   # pinned (IR373)
     user: "1000:1000"              # not root (security loop, IR414)
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
