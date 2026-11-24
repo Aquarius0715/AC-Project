@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "7c9b91bfd432e01ccebc8fa1ab141f740b9410fa537d71db17f33123e61e2897",
+  "spec_baseline_id": "2277d435fabf39c272826301950ce7cc28ca806fbb250038e6ba2f7883bb44bf",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -302,7 +302,7 @@
     },
     {
       "path": "tools/check_review_regressions.py",
-      "sha256": "aeeeef1eb17cc1e7b25dcf6bbe5197baad348f3e2abd154bc21143e236991eae"
+      "sha256": "ad8c5063581069e93cb793f955a8018b3f94007c4e37d6bce066c08d7d52b4f2"
     },
     {
       "path": "tools/gen_operation_persistence_map.py",
