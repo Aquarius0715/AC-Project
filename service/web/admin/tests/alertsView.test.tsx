@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ComponentProps, ReactNode } from "react";
 import { adminAlertRows, policyRows, type AdminPolicy, type ApiAdminAlert } from "@ac/web/lib/adminAlerts";
 import type { ApiEvidenceCandidate } from "@ac/web/lib/alertEvidence";
@@ -117,8 +117,8 @@ describe("the HQ alerts tab in API mode", () => {
     expect(actions.acknowledgeAlert).toHaveBeenCalledWith("al-1", 2);
     expect(nav.toasts).toStrictEqual(["Acknowledged"]);
     fireEvent.click(button("Acknowledge"));
-    await flush();
-    expect(nav.toasts).toHaveLength(2); // the refusal's message
+    // the refusal's message: it takes more than one macrotask on a loaded CI runner (PR #684's run failed here)
+    await waitFor(() => { expect(nav.toasts).toHaveLength(2); });
     expect(nav.toasts[1]).not.toBe("Acknowledged");
   });
 
