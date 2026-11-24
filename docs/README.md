@@ -108,6 +108,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.675.0 (2026-11-19): IR859: an HQ installation job shows the HQ request badge on the technician overview and the contractor's Jobs, job offer and Job history screens (it read Client request).
 0.676.0 (2026-11-24): IR876: a sign-in whose single sign-on holds another app's account asks for this app's password at once (that session is ended) instead of the role error, and each app's sign-in fills in the e-mail address last used there.
 0.677.0 (2026-11-24): IR877: the technician's alert evidence says what to do on site (check the windows and doors, clean the filter, find the cause …), and its resolution note matches the Resolve alert button and the technician's permission.
+0.679.0 (2026-11-25): IR879: the restriction exception screen names the permissions by their word labels (Edit restrictions, Override restrictions, View the audit log), not their codes.
 0.674.0 (2026-11-19): IR858: the technician's Refrigerant dialog refuses an emptied kilogram field instead of recording it as 0 kg.
 0.673.0 (2026-11-18): IR857: the portal keeps port 3204 behind web-edge (the server's environment file names no PORTAL_WEB_PORT).
 0.672.0 (2026-11-18): IR855, IR856 (DEC-111): the shared test environment deploys without downtime (API services and apps replaced one container at a time behind web-edge; migrations only add unless marked -- migrate:breaking), and an open page offers a reload after a deployment.
