@@ -11125,6 +11125,7 @@ A dispatcher who scoped the Overview to Demo Customer A, saw "Unresolved alerts 
    Energy's analysis tab took only the customer for its default unit set. With a property in the URL and no unit set or baseline, it now starts on that property's units, the ones the Overview's Energy KPI counts.
 2. **Docs.** DD-A01 step 7 lists the three links with their keys.
 3. **Tests.** `adminSummary.test.ts` checks the three links with no scope, a customer, and a customer and property with a period. `admin/tests/energyScope.test.ts` checks the analysis tab's default units for a customer and for a property.
+
 ## IR879 The restriction exception screen names permissions by their labels (2026-11-16 decision) — 2026-11-25
 
 Found while writing the exception-screen tests (coverage loop round 6, PR #681). The user decided on 2026-11-16 that permission codes in texts become word labels, the ones Access & roles shows (`permissionLabel`, shared/lib/permissionLabels.ts). The exception screen still showed the codes in three places:
