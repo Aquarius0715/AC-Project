@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { isValidElement, type ComponentProps, type ReactNode } from "react";
 import type { ApiRestriction, PerUnit, RestrictionState, UnitRow } from "@ac/web/lib/restrictions";
 import type { ApiAudit } from "@ac/web/lib/audit";
@@ -141,7 +141,8 @@ function viewOf(r: ApiRestriction, over: Partial<Live> = {}): Live {
   return { now: "2026-09-14T01:00:00.000Z", r, units: [unitRow()], bypass: [], canWrite: true, canOverride: true, canAudit: true, period: null, intent: "none", audit: [], ...over };
 }
 const button = (name: string | RegExp) => screen.getByRole<HTMLButtonElement>("button", { name });
-const flush = () => new Promise((r) => { setTimeout(r, 0); });
+// inside act, so the state updates the settled action makes (a closed dialog, a toast) render before the checks
+const flush = () => act(() => new Promise<void>((r) => { setTimeout(r, 0); }));
 const typeReason = (text: string) => { fireEvent.change(screen.getByLabelText(/^Reason · required/), { target: { value: text } }); };
 const setUntil = (value: string) => {
   const [picker] = screen.getAllByLabelText("date and time");
