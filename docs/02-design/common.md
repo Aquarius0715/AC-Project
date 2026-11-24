@@ -97,7 +97,7 @@ Do not show an empty state to hide a lack of viewing permission. Follow IR57 for
 
 ## 3. Frontend Screen and Mock Models
 
-The following are not database table definitions. “Save” and “history” always mean keeping data in shared mock memory within the same browser tab.
+The following are not database table definitions. “Save” and “history” always mean keeping data in shared mock memory within the same browser tab. As built, in API mode they mean the Core API's database ([database design](database-design.md)); the shared mock memory is the Phase 1A demo mode.
 
 Apply these common rules.
 
@@ -231,6 +231,8 @@ Within one level, a higher priority number wins; ties use ascending ID order (DE
 
 ## 6. Queries and Demo State
 
+As built (IR257, IR680, IR809): there is no browser query cache. With `DATA_SOURCE=api` each page is a Server Component that reads its operations through the DAL on every render; after a successful Server Action the page reads them all again (`refresh()` in the action and `router.refresh()` in `useAction`), and the toast comes only once the new screen is shown. A page that must follow changes made elsewhere re-reads itself (`useAutoRefresh`, every 30 s while the tab is shown, paused while the user edits). No page subscribes to events. Without `DATA_SOURCE=api` the Phase 1A demo renders the fixture rows, and its shared demo stores (`demoStore.ts`) keep their state in the tab's sessionStorage, so the four apps of a tab see the same demo data and a reload or the /demo reset brings back the seed. The Query keys and the single mock Repository below are the Phase 1A proposal; a "Queries to update" line of a DD names the reads that change, which as built the page reads again after the action.
+
 Query keys combine `[repositoryInstanceId, generation, viewEpoch, tenantId, membershipId, scopeVersion, resource, id, normalizedFilters, normalizedSort, cursor, limit]`. On role switch or sign-out, cancel old requests and subscriptions and clear the cache before showing the next screen. Update scopeVersion when permissions change.
 
 Only one mock Repository exists per browser tab. It holds normalized Maps and an event sequence; do not copy these into screen useState. On an update event, invalidate and refetch only the read-operation Queries listed in IR71. For example, report-completion scenario S02 updates the job and history, but waits for a separate event before resolving an Alert.
@@ -261,7 +263,7 @@ Make clocks, ID generation, and success/failure results replaceable. Avoid tests
 - UI loading/error/empty/pending/confirmed states, and rules for discarding views on role changes.
 - Frontend verification using simulated responses.
 
-API paths, HTTP methods, databases, server authentication and authorization, real payments, real notifications, and real device control are outside this document's design scope. Their open status does not prevent completion of these frontend documents. The production target is designed separately (PROPOSED, AWS per DEC-68 / IR117) in the [backend architecture](backend-architecture.md) and [network architecture](network-architecture.md) (IR116); those documents do not change Phase 1A.
+As built, the apps call the Core API through the DAL (§4); its routes, the database and authentication are designed in the backend documents linked below. API paths, HTTP methods, databases, server authentication and authorization, real payments, real notifications, and real device control are outside this document's design scope. Their open status does not prevent completion of these frontend documents. The production target is designed separately (PROPOSED, AWS per DEC-68 / IR117) in the [backend architecture](backend-architecture.md) and [network architecture](network-architecture.md) (IR116); those documents do not change Phase 1A.
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 

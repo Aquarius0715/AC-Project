@@ -15,7 +15,7 @@ This design defines features, screen fields, states, and exceptions based on the
 
 ## Inputs and Responsibilities
 
-The primary source is the [Original Company Requirements (SRC-06)](../00-prepare/sources/company-requirements-original.txt). Screens, inputs, states, and acceptance criteria follow the requirements reorganized from this source. Inputs are the [Role Requirements](../01-requirements/technician.md) and [Common Requirements](../01-requirements/common.md). Required reading is the [Common Detailed Design](common.md) and [UIUX Specification](../03-uiux/UIUXSpecification.md). The following describes frontend fields, displays, and mock behavior. Registration, assignment, payment receipt, restrictions, and audit on the screen are state changes in shared mock memory. This does not request server implementation or database design.
+The primary source is the [Original Company Requirements (SRC-06)](../00-prepare/sources/company-requirements-original.txt). Screens, inputs, states, and acceptance criteria follow the requirements reorganized from this source. Inputs are the [Role Requirements](../01-requirements/technician.md) and [Common Requirements](../01-requirements/common.md). Required reading is the [Common Detailed Design](common.md) and [UIUX Specification](../03-uiux/UIUXSpecification.md). The following describes frontend fields, displays, and mock behavior. Registration, assignment, payment receipt, restrictions, and audit on the screen are state changes in shared mock memory. This does not request server implementation or database design. As built (IR257) the apps run against the Core API (`DATA_SOURCE=api`): these changes are writes of the Core API, stored in its database with their events and audit ([backend architecture](backend-architecture.md), [database design](database-design.md)); the shared mock memory is the Phase 1A demo mode only.
 
 Treat route parameters as untrusted input and always validate them. Service names in the table are logical operations in the shared Repository. Rows with the same route describe different functions on one screen. Every row supports loading, empty, error, forbidden, and not-found displays. Show retry only for recoverable errors. For forbidden and not-found, follow IR57 and do not show retry.
 
@@ -44,7 +44,7 @@ Treat route parameters as untrusted input and always validate them. Service name
 
 1. Check the session and permission scope. Validate IDs and URL filters against schemas.
 2. Read in the route's Server Component through the DAL (API mode) or from the demo fixtures (Phase 1A); pure mappers in `shared/lib` turn the results into screen models.
-3. Forms use controlled inputs with a pure validator per form in `shared/lib`; the validators also check unit capabilities and periods, and the Core API checks again. Forms move to React Hook Form with Zod in their DEC-75 phase.
+3. Forms use controlled inputs with a pure validator per form in `shared/lib`; the validators also check unit capabilities and periods, and the Core API checks again. As built no form uses React Hook Form yet; the move named in DEC-75 has not been made.
 4. Immediately before a mutation, check the target version, permissions, and current state. For major actions, also confirm the target and reason.
 5. Write through the route's Server Action with the row version and an Idempotency-Key; the Core API records the event and audit with a correlation ID, and the route renders again with the latest state (`refresh()`). The Phase 1A demo changes the tab's shared demo store instead.
 6. Keep a waiting indicator visible while awaiting a response. Show success, denial, and failure separately. Keep form inputs when submission fails.
@@ -124,7 +124,7 @@ Scope: FR-T03 / Main display pattern: **UI-DETAIL** and **UI-ANALYSIS**. Service
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
 | unitId / metric | Required | Within assignment; supported sensor | Target series |
-| period / from / to | enum and ISO datetime/required | 1h/24h/7d/custom; default: 24h. 1h/24h are rolling windows, 7d uses calendar days, custom is at most 35 days (telemetry.series, IR121 item 2, IR213) | Period |
+| period / from / to | enum and ISO datetime/required | 1h/24h/7d; default: 24h. 1h/24h are rolling windows, 7d uses Kuala Lumpur calendar days (IR213). As built the screen offers no custom range; `telemetry.series` itself takes a custom from/to of at most 35 days (IR121 item 2) | Period |
 | observedAt / receivedAt | Read-only | UTC | Freshness |
 | staleAfterSeconds | Read-only | From sensor policy; demo: 120 seconds | Stale check |
 | eventId / version | Read-only | Duplicate and ordering control | Update basis |
@@ -134,7 +134,7 @@ Scope: FR-T03 / Main display pattern: **UI-DETAIL** and **UI-ANALYSIS**. Service
 1. Select metric and period. Check sensor, power, operation, and connection values and their times. Demo update events change values. Make stopped updates clear when communication is lost.
    - As built (IR283, IR606): the metric and the period are URL keys (`metric` opens Monitoring, `period` 1h / 24h / 7d). An hour shows its readings; a day and a week read the whole period as 5- and 60-minute averages of the valid readings (`telemetry.series` with `bucketMinutes`, IR605), so the charts cover their period. Up to three other metrics show their latest value and the period's slots. The events of the period are the unit's alert raises, acknowledgements and resolutions and its device's connection, power and tamper events (`devices.list` → `devices.events` with from / to).
 2. Keep observation time (measured on site) separate from receipt time (received by the server). Mark data stale after staleAfterSeconds. Do not overwrite current values with older events. Keep series units fixed and leave gaps where data is missing.
-3. Keep latest values and time-series charts consistent using the same eventId and version. Unsubscribe when leaving the screen or changing scope.
+3. Keep latest values and time-series charts consistent using the same eventId and version. As built the page subscribes to nothing: it shows the values as of its render, with their times and read-time quality from the Core API, and a reload reads them again.
 4. Queries to update: `telemetry / unit summary`.
 
 **Boundary cases and failures**: Reordered or duplicate events must not roll values back. While offline, the last received value may remain with its timestamp, but must not be shown as live.
@@ -400,6 +400,7 @@ Scope: FR-T12 / Main display pattern: **UI-DETAIL** and **UI-TIMELINE**. Service
 **Steps**
 
 1. Simulate communication loss, power loss, and removal detection separately. Check notifications, enter response notes, and record recovery or confirmation.
+   - As built the device screen has no demo controls: /demo triggers a communication loss of a bound device and its restoration (`demo.trigger`, SR20); The IoT bridge sends the same communication loss and restoration for a live node that falls silent and returns. `demo.trigger` also takes power_lost and tamper, but no screen sends them (the Go integration tests do).
 2. Manage connection and tamper states separately. Identify power loss only when the demo provides a dedicated power signal. Missing heartbeats alone do not prove power loss.
 3. Save detection time, observation evidence, response details, and recovery time as separate events. Acknowledging a notification does not change the device's physical state.
 4. Queries to update: `devices / alerts / device events / notifications / audit`.
@@ -414,7 +415,7 @@ Scope: FR-T12 / Main display pattern: **UI-DETAIL** and **UI-TIMELINE**. Service
 
 Scope: FR-T13 / Main display pattern: **UI-FORM**. Service boundary: `units.resolveQr, jobs.checkIn, jobs.get, units.get, units.list, jobs.list`.
 
-**Initial view and prerequisites**: “▣ Scan QR” in the Overview header or Check in from Start job. Camera access is simulated in the demo; the label code can be typed.
+**Initial view and prerequisites**: “▣ Scan QR” in the app header (as built on every technician page, `AppShell`) or Check in from Start job. Camera access is simulated in the demo; the label code can be typed.
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
@@ -517,4 +518,4 @@ Scope: FR-T16 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, 
 
 Additional contracts: every IR in the [Re-review Correction Contracts](review-resolution-contracts.md) applies, the newest included. They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
-Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.
+Apply IR34 to job-list and jobs.list sorting. As built the technician overview (DD-T01) offers three sorts, each in one direction: `severity` (most severe first, the default when the URL has no sort), `dueAt` (soonest first) and `status` (earliest stage first). Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot.
