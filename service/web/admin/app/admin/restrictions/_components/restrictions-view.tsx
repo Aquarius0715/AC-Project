@@ -69,7 +69,7 @@ function Manager({ live }: Readonly<{ live: NonNullable<RestrictionsLive> }>) {
   const step = stepOf();
   const exec = sel?.texts.execute ?? null;
   const release = sel?.texts.release ?? null;
-  const recovery: Partial<Record<RestrictionRecoveryCase["state"], string>> = { pending: t("pending"), removing: t("removing"), resolved: t("resolved") };
+  const recovery: Record<RestrictionRecoveryCase["state"], string> = { pending: t("pending"), removing: t("removing"), resolved: t("resolved") };
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -127,7 +127,7 @@ function Manager({ live }: Readonly<{ live: NonNullable<RestrictionsLive> }>) {
               ]} />
               <p className="mt-2 text-[11px] text-muted-foreground">{t("Retry and Reconcile appear only for units that are pending, failed or waiting for reconciliation. Reaching the deadline never stops real equipment by itself.")}</p>
             </Card>
-            {r.recoveryCases.length > 0 && <Card title={t("Recovery cases")} sub={t("Earlier observed restrictions to reconcile explicitly")}>{r.recoveryCases.map((c) => <p key={c.id} className="text-[13px]">{c.unitId.slice(0, 8)} · <Badge tone={c.state === "resolved" ? "ok" : "warn"}>{recovery[c.state] ?? c.state}</Badge></p>)}</Card>}
+            {r.recoveryCases.length > 0 && <Card title={t("Recovery cases")} sub={t("Earlier observed restrictions to reconcile explicitly")}>{r.recoveryCases.map((c) => <p key={c.id} className="text-[13px]">{c.unitId.slice(0, 8)} · <Badge tone={c.state === "resolved" ? "ok" : "warn"}>{recovery[c.state]}</Badge></p>)}</Card>}
           </div>
         ) : <Card title={t("Restriction")}><EmptyState title={t("Nothing selected")}>{t("Choose a restriction.")}</EmptyState></Card>}
       </div>
