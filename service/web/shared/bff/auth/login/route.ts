@@ -1,10 +1,12 @@
 import { createHash, randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
-import { OIDC_COOKIE, oidcConfigFor, oidcCookieOptions, safeReturnTo, seal } from "@ac/web/lib/session";
+import { LOGIN_HINT_COOKIE, loginHintOf, OIDC_COOKIE, oidcConfigFor, oidcCookieOptions, safeReturnTo, seal } from "@ac/web/lib/session";
 
 // GET /bff/auth/login?returnTo=<path>[&reauth=1]: starts the OIDC authorization-code flow with
 // PKCE. reauth=1 asks the identity provider for the password again (prompt=login): after HQ signed the user out
-// everywhere, its single sign-on would answer with the old sign-in, which the Core API refuses (IR385).
+// everywhere, its single sign-on would answer with the old sign-in, which the Core API refuses (IR385), and when the
+// single sign-on held another app's account (IR876). Every start names this app's last account (login_hint), which the
+// provider's form fills in; a single sign-on that is still open answers with its own account instead.
 export function GET(req: NextRequest) {
   const config = oidcConfigFor(req.headers.get("host")); // the listed address the browser came by (IR651)
   const state = randomBytes(16).toString("base64url");
@@ -12,6 +14,7 @@ export function GET(req: NextRequest) {
   const challenge = createHash("sha256").update(verifier).digest("base64url");
   const returnTo = req.nextUrl.searchParams.get("returnTo");
   const isReauth = req.nextUrl.searchParams.get("reauth") === "1";
+  const hint = loginHintOf(req.cookies.get(LOGIN_HINT_COOKIE)?.value);
   const url = new URL(`${config.issuer}/protocol/openid-connect/auth`);
   url.search = new URLSearchParams({
     client_id: config.clientId,
@@ -22,6 +25,7 @@ export function GET(req: NextRequest) {
     code_challenge: challenge,
     code_challenge_method: "S256",
     ...(isReauth && { prompt: "login" }),
+    ...(hint !== null && { login_hint: hint }),
   }).toString();
   const res = NextResponse.redirect(url);
   res.cookies.set(OIDC_COOKIE, seal({ state, verifier, returnTo: safeReturnTo(returnTo), reauth: isReauth }), oidcCookieOptions());
