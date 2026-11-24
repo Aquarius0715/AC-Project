@@ -42,7 +42,7 @@ The four main document types are PrepareDocument, requirements, detailed design,
 
 Keep the original requirement IDs. Update the PrepareDocument decision table, affected requirements and designs, traceability matrix, and acceptance criteria together in the same change. Do not reuse retired IDs. Record evidence using the [artifact templates](04-agentic-sdlc/templates/artifacts.md).
 
-Current approver: not assigned / Implementation: not started / Application behavior checks: not run. Document consistency checks and application acceptance tests are separate activities.
+Current approver: not assigned / Implementation: built in `service/` (see `README.md` at the repository root); the application's unit, integration and end-to-end tests run in CI (container design §6). Where these documents and the implementation differed, the documents were brought to the implementation on 2026-11-24. Document consistency checks and application acceptance tests are separate activities.
 
 0.5.0 (2026-09-15): Organized 26 items from the [company original](00-prepare/sources/company-requirements-original.txt) and revised the common and four-role requirements, detailed designs, and UIUX specification. The [company requirement map](00-prepare/company-requirement-map.csv), [requirement origins](00-prepare/requirement-origins.csv), and [traceability matrix](00-prepare/traceability.csv) show the original text, added design details, and acceptance criteria. Clarified the display of open windows, poor insulation, allergens, card categories, Scope 2, and the market integration concept. Preserved visual values from the reference HTML/CSS.
 
