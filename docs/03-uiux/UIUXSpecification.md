@@ -114,6 +114,7 @@ Limit Context to information that needs broad distribution, such as session data
 - Allow incomplete inspection drafts to be saved. Submission schemas require all mandatory fields. Create a new report instead of directly editing a completed form.
 - Check temperature, time, and money boundaries when converting strings to numbers. Do not treat an empty string as 0. Get allowed ranges from capability data or shared schemas.
 - Ask whether to discard changes only when leaving with unsaved input. Do not add unnecessary confirmation to normal viewing navigation.
+- As built (IR620): a refused submission marks its fields, shows each message under its field and focuses the first one to fix (`focusField`); there is no error summary with links at the top, and leaving a page with unsaved input asks nothing (editors that track it say “Unsaved changes” or “No unsaved changes” in their footer).
 
 ## UX-04. Design tokens based on the reference design
 
