@@ -20,7 +20,7 @@ vi.mock("@ac/web/lib/useAction", () => ({
 }));
 // the date-and-time picker as one text box: the view only passes its value on
 vi.mock(import("@ac/web/components/TimeSelect"), async (importOriginal) => ({
-  ...await importOriginal(),
+  ...(await importOriginal()),
   DateTimeSelect: ({ value, onChange }: Readonly<{ value: string; onChange: (v: string) => void }>) => <input aria-label="Work end" value={value} onChange={(e) => { onChange(e.target.value); }} />,
 }));
 
