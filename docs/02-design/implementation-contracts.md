@@ -208,12 +208,16 @@ The table summarizes visibility. IR95 is authoritative for whether to generate n
 
 ## DDC-05 Frontend Boundary Completion Criteria
 
+As built (IR257): the screens reach data through the server-side DAL (`shared/lib/dal.ts`), which calls each operation at its Core API REST route; the Phase 1A demo renders fixture rows instead. Pure mappers in `shared/lib` turn the results into display data, and the Vitest suites check them with synthetic results. The criteria below are the Phase 1A proposal.
+
 - Map each [Operation Catalog](operation-catalog.csv) operation to screen input types, return values, and mock results.
 - UI accesses and changes data through service interfaces, without direct dependency on mock implementations.
 - Use synthetic success, accepted/pending, failure, conflict, and access-denied results to verify expected display and recovery.
 - Provide an adapter replacement boundary for a future real API. Replacement alone does not guarantee production connectivity; define D11 production contracts first. HTTP adapter implementation/testing, production authentication, and server processing design are outside these completion criteria.
 
 ## DDC-06 Screen Structure and Local State
+
+As built: a page is a Server Component that reads its data and passes it to one client view; there are no Query hooks and no React Hook Form (DDC-03, common design §6). Targets, periods, tabs and list pages live in the URL, open dialogs and form drafts in the client view's state. The paragraph below is the Phase 1A proposal.
 
 Each role page uses shared Shell and UI patterns. Pages compose URLs, Query hooks, and forms; primitives do not import Repository directly. Keep RHF forms separate using target ID as key. Refetching must not automatically reset unsaved dirty values.
 
@@ -288,7 +292,7 @@ These are phase 1A design proposals under DEC-10, not final commercial business 
 | inquiries.list | Customers receive `Inquiry` linked to their own `invoiceId`/`restrictionId`; HQ receives those within `billing.write` scope | Customers see received/answered and reply. Open the same invoice through answer-notification target.id, then select inquiryId. Never return another customer's reply |
 | devices.addResponseNote | Append `responseNote` (1–1000 characters) to `deviceId`/`eventId` with author, time, and correlation ID | Requires `device.maintain` and active assignment. Notes do not change connection or tamper state. Recovery is a separate `/demo` event |
 
-Keep image bodies in shared Repository `Map<blobId, Blob>`. Sign-out and role switching do not delete shared Blobs. Locally selected unsaved images may be discarded on leave. Remove draft photos through differences in `jobs.saveDraft.attachmentIds`. Keep Blobs referenced by older submitted versions; release unreferenced Blobs. Reset releases all Blobs and temporary URLs. Submission failure must not lose text or saved images.
+As built the Core API keeps uploads in its blob store and each app streams a file back through its own route once the Core API has authorized the read (for example `/technician/jobs/:id/photos/:attachmentId`, `attachments.getContent`; [backend architecture](backend-architecture.md)); no object URL of a report photo is made in the browser. The Phase 1A design follows. Keep image bodies in shared Repository `Map<blobId, Blob>`. Sign-out and role switching do not delete shared Blobs. Locally selected unsaved images may be discarded on leave. Remove draft photos through differences in `jobs.saveDraft.attachmentIds`. Keep Blobs referenced by older submitted versions; release unreferenced Blobs. Reset releases all Blobs and temporary URLs. Submission failure must not lose text or saved images.
 
 `WorkReportDraft` inputs are jobId, reportId (absent initially), items (InspectionItemInput), measurements (InspectionMeasurementInput), parts, workText, nextAction, and attachmentIds. The first response returns reportId/version; updates require `expectedVersion`. Drafts may be incomplete. Submit validates each DD's required fields. Never directly edit submitted/past versions. Rework or reassignment creates a new draft version referencing the old one, preserving past versions and each record's author.
 

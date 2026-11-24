@@ -29,6 +29,8 @@ The [Aconland Mudah Milik customer Loyalty page](https://aconland-mudah-milik.ve
 
 ### 1.3 Current scope
 
+As built (2026-11-24): the application has gone beyond this scope. `service/` holds the Go Core API with its database, the IoT bridge and simulator, Stripe Checkout in test mode, e-mail through the notification worker, and the five Next.js apps, which run against the Core API; the Phase 1A demo mode remains. The [documents' README](../README.md) gives the implementation status. The scope below is the one this preparation was written for.
+
 **The deliverables are frontend design documents only.** They define displayed information, input fields, action flows, state changes, shared design, and demo data handling. They retain the principle of separating screens from data access for future API connections.
 
 The development stages are as follows. **1A** is the clickable frontend demo within the original Phase 1 (split AC units). **1B** is the complete solution in the same Phase 1, including devices, firmware, and production API connections. **Phase 2** extends to HVAC. These documents cover only 1A.
