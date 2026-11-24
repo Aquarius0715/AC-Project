@@ -72,7 +72,15 @@ const unescaped = (literal: string) =>
 
 const keys = new Set<string>();
 for (const file of swiftFiles(ios)) {
-  for (const match of readFileSync(file, "utf8").matchAll(/\btr\(\s*"((?:[^"\\]|\\.)*)"/g)) keys.add(unescaped(match[1] ?? ""));
+  for (const match of readFileSync(file, "utf8").matchAll(/\btr\(\s*"((?:[^"\\]|\\.)*)"/g)) {
+    const literal = match[1] ?? "";
+    // an interpolated key (tr("Hi \(name)")) differs at run time from any key in the catalog, and an empty one is a
+    // multi-line literal ("""): either would show in English only
+    if (literal === "" || /(?<!\\)(?:\\\\)*\\\(/.test(literal)) {
+      throw new Error(`${path.relative(ios, file)}: tr("${literal}") is no fixed key; write a placeholder in braces and pass its value in tr's second argument`);
+    }
+    keys.add(unescaped(literal));
+  }
 }
 for (const texts of Object.values(actionTexts)) for (const text of Object.values(texts)) keys.add(text);
 const mine = new Map(Object.entries(own));

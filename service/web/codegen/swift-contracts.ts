@@ -64,6 +64,14 @@ const pending = new Set<string>(); // being written: a reference while writing i
 const enums = new Map<ts.Type, string>();
 // the same for an object written once and met in two places: UnitAction's members are Command.action's too
 const objects = new Map<ts.Type, string>();
+// the type each Swift name was given to: a name made for an anonymous type (Job + status = JobStatus) may be a contract
+// alias's too, and the later type would silently take the earlier one's declaration
+const owners = new Map<string, ts.Type>();
+const claim = (name: string, t: ts.Type, place: string) => {
+  const owner = owners.get(name);
+  if (owner !== undefined && owner !== t) fail(place, `${name} names two different types`);
+  owners.set(name, t);
+};
 
 const isNull = (t: ts.Type) => (t.flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined)) !== 0;
 const isStringLiteral = (t: ts.Type): t is ts.StringLiteralType => t.isStringLiteral();
@@ -118,7 +126,11 @@ function single(t: ts.Type, place: string, name: string, generics: Generics): st
   if (isString(t)) return "String";
   if (isNumber(t)) return "Double";
   if (isBooleanLike(t)) return "Bool";
-  if (isStringLiteral(t)) return stringEnum([t], aliasName(t) ?? name);
+  if (isStringLiteral(t)) {
+    const own = aliasName(t) ?? name;
+    claim(own, t, place);
+    return stringEnum([t], own);
+  }
   if (checker.isArrayType(t) || checker.isTupleType(t)) {
     const element = checker.getIndexTypeOfType(t, ts.IndexKind.Number) ?? fail(place, "an array without an element type");
     return `[${swiftType(element, `${place}[]`, name, generics)}]`;
@@ -133,13 +145,17 @@ function union(members: ts.Type[], whole: ts.Type, place: string, name: string, 
   if (members.every((m) => isStringLiteral(m))) {
     const known = enums.get(plain);
     if (known) return known;
+    claim(own, plain, place);
     enums.set(plain, own);
     return stringEnum(members.filter((m) => isStringLiteral(m)), own);
   }
   if (members.every((m) => isBooleanLike(m))) return "Bool"; // boolean is true|false
   if (members.every((m) => isNumber(m))) return "Double";
   if (members.some((m) => isString(m)) && members.every((m) => isStringLiteral(m) || isString(m))) return "String";
-  if (members.every((m) => isObject(m))) return taggedUnion(members, own, place, generics);
+  if (members.every((m) => isObject(m))) {
+    claim(own, plain, place);
+    return taggedUnion(members, own, place, generics);
+  }
   return fail(place, `the union ${checker.typeToString(whole)}`);
 }
 
@@ -196,6 +212,7 @@ function objectType(t: ts.Type, place: string, name: string, generics: Generics)
   const known = objects.get(t);
   if (known) return known;
   const own = alias ?? name;
+  claim(own, t, place);
   objects.set(t, own);
   if (!declarations.has(own) && !pending.has(own)) {
     pending.add(own);

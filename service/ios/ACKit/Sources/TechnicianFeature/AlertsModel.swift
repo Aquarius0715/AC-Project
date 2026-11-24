@@ -104,8 +104,10 @@ public final class AlertsModel {
         candidates = items
     }
 
-    /// Shows another alert of the unit; its resolution starts empty.
+    /// Shows another alert of the unit; its resolution starts empty. Not while a step is sent: its note or refusal
+    /// would show under the other alert.
     public func select(_ alertId: String) async {
+        guard !isSending else { return }
         selectedId = alertId
         reason = ""
         picked = []

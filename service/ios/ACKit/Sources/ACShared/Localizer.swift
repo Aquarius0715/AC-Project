@@ -64,6 +64,5 @@ public func tr(_ key: String, _ values: [String: String] = [:]) -> String {
     var text = Localizer.text(key)
     if text == key, let context = key.range(of: "::") { text = String(key[context.upperBound...]) }
     // one pass, as the web's: a filled value is not read again for placeholders (a unit named "{place}" stays as named)
-    // one pass, as the web's: a filled value is not read again for placeholders (a unit named "{place}" stays as named)
     return text.replacing(/\{(\w+)\}/) { match in values[String(match.1)] ?? String(match.0) }
 }
