@@ -33,10 +33,15 @@ describe("HQ overview sections (DD-A01, IR244)", () => {
     expect(overviewLinks({ customerId: "c1", propertyId: null, period: { from: "2026-09-14T00:00:00Z", to: "2026-09-15T00:00:00Z" } }).waiting).toBe("/admin/jobs?customerId=c1&stage=requested");
     const l = overviewLinks({ customerId: "c1", propertyId: null });
     expect([l.units, l.power("off"), l.connection("connecting,error,unknown"), l.jobs("assigned"), l.billing, overviewLinks({ customerId: null, propertyId: null }).units])
-      .toStrictEqual(["/admin/units?customerId=c1", "/admin/units?customerId=c1&powerState=off", "/admin/units?customerId=c1&connections=connecting%2Cerror%2Cunknown", "/admin/jobs?customerId=c1&stage=assigned", "/admin/billing?overdueOnly=true", "/admin/units"]);
+      .toStrictEqual(["/admin/units?customerId=c1", "/admin/units?customerId=c1&powerState=off", "/admin/units?customerId=c1&connections=connecting%2Cerror%2Cunknown", "/admin/jobs?customerId=c1&stage=assigned", "/admin/billing?customerId=c1&overdueOnly=true", "/admin/units"]);
     const withPeriod = overviewLinks({ customerId: null, propertyId: null, period: { from: "2026-09-13T16:00:00.000Z", to: "2026-09-14T01:00:00.000Z" } });
     // IR807: Unresolved alerts counts critical and warning, so its list opens on those
-    expect(l.alerts).toBe("/admin/alerts?severity=attention");
+    // IR878: alerts, unpaid invoices and energy open on the customer and property the KPIs count
+    expect([l.alerts, l.energy]).toStrictEqual(["/admin/alerts?customerId=c1&severity=attention", "/admin/energy?customerId=c1"]);
+    const all = overviewLinks({ customerId: null, propertyId: null });
+    expect([all.alerts, all.billing, all.energy]).toStrictEqual(["/admin/alerts?severity=attention", "/admin/billing?overdueOnly=true", "/admin/energy"]);
+    const tower = overviewLinks({ customerId: "c1", propertyId: "p1", period: { from: "2026-09-13T16:00:00.000Z", to: "2026-09-14T01:00:00.000Z" } });
+    expect([tower.alerts, tower.billing, tower.energy]).toStrictEqual(["/admin/alerts?customerId=c1&propertyId=p1&severity=attention", "/admin/billing?customerId=c1&propertyId=p1&overdueOnly=true", "/admin/energy?customerId=c1&propertyId=p1"]); // no period: their lists are current or take other formats
     expect([withPeriod.jobs("completed"), withPeriod.units]).toStrictEqual(["/admin/jobs?stage=completed&from=2026-09-13T16%3A00%3A00.000Z&to=2026-09-14T01%3A00%3A00.000Z", "/admin/units"]);
   });
 
