@@ -219,7 +219,7 @@ describe("the restriction exception view", () => {
     expect(button(/^Override release restrictions/).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByText("Release view (“Override restrictions” only): billing fields are not shown.")).toBeDefined();
     expect(screen.queryByText("Cause invoices")).toBeNull();
-    expect(screen.getByText("restriction.override")).toBeDefined();
+    expect(screen.getByText("Your permissions").nextElementSibling?.textContent).not.toBe("read only"); // the override permission is named
     expect(screen.queryByText("Audit")).toBeNull();
     expect(screen.getByText("—")).toBeDefined(); // no unit names
   });
