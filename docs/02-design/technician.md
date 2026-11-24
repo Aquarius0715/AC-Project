@@ -67,14 +67,13 @@ Scope: FR-T01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `jobs.l
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| from / to | date/required | Default: today; maximum 366 days. Convert YYYY-MM-DD calendar dates in the display timezone to UTC Instants (IR74) | Schedule |
-| status | enum/optional | assigned/in_progress/on_hold/submitted/rework_requested/completed/all (all means omit status, IR90) | Progress |
-| severity | enum/optional | critical/warning/all (all means omit filters.severity, IR74) | Priority |
+| tab | enum/optional | `today` (default: today's timeline in Kuala Lumpur time) / `all` (every assigned job, Sidebar › Assigned jobs) | Schedule |
+| sort | enum/optional | `severity` (default, most severe first) / `dueAt` (soonest first) / `status` (earliest stage first), IR34 | Priority and progress |
 | summary | Read-only | Assigned unit count, not started, overdue | Assigned-scope summary |
 
 **Steps**
 
-1. Open assigned jobs for today or the selected period. Sort by alert severity, deadline, and progress. Open unit details or the work screen.
+1. Open today's assigned jobs or all of them (`tab`). Sort by alert severity, deadline, or progress (`sort`); as built there is no period, status or severity filter. Open unit details or the work screen.
 2. Apply these business conditions to reads and actions. “Not addressed” means jobs assigned to the user that have not started, not all requested jobs. Internal users viewing multiple jobs must still stay within their tenant and assigned scope.
 3. This screen is read-only. For zero scheduled jobs, show an empty state and a way to view past history.
 4. Queries to update: `jobs / assignments / alerts`.
@@ -454,7 +453,7 @@ Scope: FR-T14 / Main display pattern: **UI-FORM**. Service boundary: `jobs.saveD
 
 **Steps**
 
-1. + Add part opens a centered modal; “Add to report” appends a Part and autosaves via `jobs.saveDraft`. Remove deletes the line from the draft.
+1. + Add part opens a centered modal; “Add” appends a Part and autosaves via `jobs.saveDraft`. Remove deletes the line from the draft.
 2. + Refrigerant adds a RefrigerantRecord with the computed net amount.
 3. Time on site shows arrivedAt (check-in), startedAt, pauses, finishedAt (on submit), and on-site minutes; Pause work calls `jobs.pauseWork`.
 4. Queries to update: `reports / jobs`.
@@ -480,7 +479,7 @@ Scope: FR-T15 / Main display pattern: **UI-FORM**. Service boundary: `reports.si
 **Steps**
 
 1. The centered modal summarises job, work, parts, and on-site time; Clear resets the pad.
-2. Confirm calls `reports.signOff` with reportId and reportVersion; the workspace badge shows “Signed hh:mm”.
+2. Confirm calls `reports.signOff` with reportId and reportVersion; the workspace shows “Signed · {name} · {time}”.
 3. Submitting without a sign-off shows a warning dialog; continuing requires an absence reason.
 
 **Boundary cases and failures**: A newer draft version clears the sign-off (CONFLICT if the version changed while signing).

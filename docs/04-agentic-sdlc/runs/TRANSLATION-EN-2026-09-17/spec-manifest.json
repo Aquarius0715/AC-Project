@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "8d1cac79e4f378fece569b3c1295889a7bbc8080c06c3bf1b09cca4acf7bc454",
+  "spec_baseline_id": "1566118dee06daf3b972dbfeaa7b8202146000807ae3d90fcd4e44c610c9913b",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -98,7 +98,7 @@
     },
     {
       "path": "02-design/admin.md",
-      "sha256": "084e5953110c7a29408164554ce295776a3cbc07e9f6893361f317671535f7d9"
+      "sha256": "2a11dceadaeeb84c40219522c300c8a9e9ebd87e24d1fd3a2f530b40ce5c0f44"
     },
     {
       "path": "02-design/api/swagger.json",
@@ -114,11 +114,11 @@
     },
     {
       "path": "02-design/client.md",
-      "sha256": "64e5b8110b9d8881d6e10dfc769126c0f27acfd23d89de0555a2a80a87fca72e"
+      "sha256": "49739e866826a535d4d0d8fdec2272d6af54866371b5c338c78a69472a2b6f3d"
     },
     {
       "path": "02-design/common.md",
-      "sha256": "3f616c4544c9be9c30e8ad304db666076246093c0d7d8b232730eef2ee0edb1c"
+      "sha256": "268a84ad94fcfc7705502a6f865379369198444b37f40257ac46ab1edf270f8a"
     },
     {
       "path": "02-design/container-design.md",
@@ -126,7 +126,7 @@
     },
     {
       "path": "02-design/contractor.md",
-      "sha256": "c4bbca6501cb796b4694456669607b694de8acad78c90c1593150e7032a5386b"
+      "sha256": "f71bd52ffa9c8a7a5d55c7fe427a849080a57b7fcde3ad42fe854ed7b8493b0a"
     },
     {
       "path": "02-design/database-design.md",
@@ -182,7 +182,7 @@
     },
     {
       "path": "02-design/technician.md",
-      "sha256": "31e6bfd78c058438ada573e804bf6822740cdaa3baeedf944b6e3bfc35336b3c"
+      "sha256": "12f10ff506317614e8e32550c3452e50cd0c8f8aadacbb34e105f753200e7a69"
     },
     {
       "path": "02-design/write-version-catalog.csv",

@@ -423,7 +423,7 @@ Scope: FR-C10 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 3. For non-RTO general/energy/environment contracts, show contract type, period, and invoices. This screen is read-only. Only when there are zero contracts, show “No contract — general maintenance” with a path back to monitoring.
 4. Queries to update: `contracts / invoices (read-only)`.
 
-**Boundary cases and failures**: Customer A cannot fetch customer B's invoiceId. Do not show “Start payment” for paid invoices.
+**Boundary cases and failures**: Customer A cannot fetch customer B's invoiceId. Do not show “Pay now” for paid invoices.
 
 **Verification**: Check the traceability entries under AT-C10 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -579,7 +579,7 @@ Scope: FR-C15 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 **Steps**
 
-1. Alert policies tab: the default policy card (“Limits set by HQ · on/off is set by the account owner”) lists six rules with condition, type, severity, and an On toggle; toggling calls `policies.setDefaultRule` for the customer (applies to all its ACs). Only clientRole=owner can toggle (IR115); members see disabled toggles with “Only the account owner can change this”.
+1. Alert policies tab: the default policy card (“Limits set by HQ · on / off is set by the account owner”) lists six rules with condition, type, severity, and an On toggle; toggling calls `policies.setDefaultRule` for the customer (applies to all its ACs). Only clientRole=owner can toggle (IR115); members see disabled toggles with “Only the account owner can change this”.
 2. “Your policies” lists each policy with its When/Then sentences, attached ACs, Edit and ⋯ (Delete). “+ Create policy” and Edit open the editor (centered panel) with a live summary sentence.
 3. Save calls `policies.save` (kind=alert, customerId=own customer). Attaching happens on each AC (DD-C03) via `units.setAlertPolicies`; the editor shows “Attached to” read-only.
 4. Delete confirms with the attached AC names; `policies.delete` detaches from every unit and deletes (IR108).
