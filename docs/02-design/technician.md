@@ -235,6 +235,8 @@ Add `causeCode` (`window_open` / `insulation_loss` / `unknown`), `evidenceKind` 
 
 Verification: AT-T07-SRC uses three fixtures: suspected open window, inspection record of poor insulation, and no evidence. Each has different wording, evidence, and time. Marking a notification read alone does not resolve the alert.
 
+As built (IR877): the banner of an unresolved alert adds "What to do on site: …". The step goes by the suspected cause, then the type, with a fault last: check the windows and doors (window_open), look for gaps (insulation_loss), clean the filter (maintenance), check the ventilation and the sensor (quality), check the cover and the restriction device (tamper, restriction_bypass), nothing on site (reconciliation_required), and otherwise find the cause and record it in the work report. An inspection record needs nothing. The resolution note says how the alert resolves for this technician: by a remeasurement, below with a reason when they hold alert.resolve, or by asking a user with “Resolve alerts”.
+
 **Source mapping**: SRC-06 BIZ-08, BIZ-11, BIZ-17 → FR-T07 → DD-T07. Source category: original company requirements SRC-06 + design additions. Design addition: possible causes, evidence, and resolution steps. Field types, required status, defaults, and action order are implementation proposals.
 
 Scope: FR-T07 / Main display pattern: **UI-DETAIL**. Service boundary: `alerts.list, alerts.acknowledge, alerts.resolve, alerts.evidence, units.get, jobs.get`.
