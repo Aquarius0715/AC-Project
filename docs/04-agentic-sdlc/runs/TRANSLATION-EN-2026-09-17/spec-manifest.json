@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "1566118dee06daf3b972dbfeaa7b8202146000807ae3d90fcd4e44c610c9913b",
+  "spec_baseline_id": "3cbb3d3a99150221e4a3bc8994dcfffeb19d20f89eed0a27cf1faa62df365927",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -98,7 +98,7 @@
     },
     {
       "path": "02-design/admin.md",
-      "sha256": "2a11dceadaeeb84c40219522c300c8a9e9ebd87e24d1fd3a2f530b40ce5c0f44"
+      "sha256": "1376208b12444cf78d4b1bbb0513880c4b0d346c64df74caef03eea67ee5eef1"
     },
     {
       "path": "02-design/api/swagger.json",
@@ -178,7 +178,7 @@
     },
     {
       "path": "02-design/strict-review-contracts.md",
-      "sha256": "9b8f7f977bf5320a1dc4c6f1c6ef85168b4ffa66ed4aff5508651da754cde367"
+      "sha256": "9066bfe12c2a6c8119353d31a23fa0cc15a6fa2435e88ffa58ccd3d4c4d2c09f"
     },
     {
       "path": "02-design/technician.md",
