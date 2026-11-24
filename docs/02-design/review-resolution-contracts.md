@@ -11126,3 +11126,14 @@ A dispatcher who scoped the Overview to Demo Customer A, saw "Unresolved alerts 
 2. **Docs.** DD-A01 step 7 lists the three links with their keys.
 3. **Tests.** `adminSummary.test.ts` checks the three links with no scope, a customer, and a customer and property with a period. `admin/tests/energyScope.test.ts` checks the analysis tab's default units for a customer and for a property.
 
+## IR879 The restriction exception screen names permissions by their labels (2026-11-16 decision) — 2026-11-25
+
+Found while writing the exception-screen tests (coverage loop round 6, PR #681). The user decided on 2026-11-16 that permission codes in texts become word labels, the ones Access & roles shows (`permissionLabel`, shared/lib/permissionLabels.ts). The exception screen still showed the codes in three places:
+- the Summary's "Your permissions" row read `restriction.write · restriction.override · audit.read`;
+- the Audit card's subtitle read `audit.read`;
+- the Override release card added `· restriction.override` after its operation name.
+
+1. **Screen.** "Your permissions" lists the held permissions with `permissionLabel` ("Edit restrictions · Override restrictions · View the audit log"), or "read only". The Audit card's subtitle is "View the audit log". The override card shows its operation name only, like the other three cards.
+2. **Search.** No other screen of the four apps shows a permission code as text (the demos aside).
+3. **Tests.** `admin/tests/exceptionPermissions.test.tsx` checks the labels, that no code is shown, and "read only".
+
