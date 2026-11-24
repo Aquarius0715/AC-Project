@@ -179,6 +179,11 @@ export function webConfig(tsconfigRootDir) {
         // 4-2: a member of a new value reads as one expression (new Date(x).toISOString(), new Set(xs).size); a
         // variable for each would only lengthen the code
         "unicorn/no-unreadable-new-expression": "off",
+        // 4-2: the formatters and view helpers take the display language last (i: I18n = EN, d: Display), as hundreds of
+        // functions here do. This rule (new in unicorn 80) reads that I18n as an options object and asks the optional
+        // parameters before it (tz = KL, max = 3) to move into one, which would give the 35 flagged functions a second
+        // way of being called beside every other helper
+        "unicorn/prefer-options-parameter": "off",
         // 2: the conventional short names stay short. props, ref, params, req, res and env are the platform's and
         // React's; e, i, j, acc, prev, fn and el the usual names in handlers, loops, reducers and state updaters
         "unicorn/name-replacements": [

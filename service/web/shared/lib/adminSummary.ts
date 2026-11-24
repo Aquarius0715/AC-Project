@@ -60,8 +60,9 @@ export function overviewLinks(q: { customerId: string | null; propertyId: string
   };
   return {
     units: `/admin/units${scope()}`, power: (state: "on" | "off" | "unknown") => `/admin/units${scope({ powerState: state })}`,
-    connection: (c: string) => `/admin/units${scope({ connections: c })}`, alerts: "/admin/alerts?severity=attention", billing: "/admin/billing?overdueOnly=true",
-    jobs: (stage?: string) => `/admin/jobs${scope({ ...(stage && { stage }), ...(q.period && { from: q.period.from, to: q.period.to }) })}`, energy: "/admin/energy",
+    // alerts, unpaid invoices and energy keep the scope their KPIs count (IR878); their periods are other formats, so only jobs take it
+    connection: (c: string) => `/admin/units${scope({ connections: c })}`, alerts: `/admin/alerts${scope({ severity: "attention" })}`, billing: `/admin/billing${scope({ overdueOnly: "true" })}`,
+    jobs: (stage?: string) => `/admin/jobs${scope({ ...(stage && { stage }), ...(q.period && { from: q.period.from, to: q.period.to }) })}`, energy: `/admin/energy${scope()}`,
     // the requests waiting for HQ, whatever their requested time (DEC-90, IR611)
     waiting: `/admin/jobs${scope({ stage: "requested" })}`,
   };
