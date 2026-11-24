@@ -53,7 +53,8 @@ export function AlertEvidenceView({ live }: Readonly<{ live: AlertsLive }>) {
     <Page>
       {head}
       <div className={cx("flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3", BANNER[a.banner.tone])}>
-        <div className="min-w-0"><b className="block text-[15px]">{a.banner.title}</b><span className="text-xs">{a.banner.sub}</span></div>
+        <div className="min-w-0"><b className="block text-[15px]">{a.banner.title}</b><span className="text-xs">{a.banner.sub}</span>
+          {a.next && <span className="mt-1 flex items-start gap-1 text-[13px] font-semibold text-ink"><Icon name="arrowRight" className="mt-0.5 shrink-0 text-primary" />{t("What to do on site: {step}", { step: a.next })}</span>}</div>
         <div className="flex items-center gap-2"><SeverityBadge s={a.severity} />{a.status === "open" ? <Btn size="sm" disabled={busy} onClick={() => { act("acknowledge"); }}>{t("Acknowledge")}</Btn> : <b className="text-xs">{a.banner.state}</b>}</div>
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "260px" }}>

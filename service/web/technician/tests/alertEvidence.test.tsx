@@ -25,7 +25,7 @@ import { MockAlertEvidence } from "../app/technician/units/[id]/alerts/_componen
 
 const view = (over: Partial<AlertView> = {}, resolution: Partial<AlertView["resolution"]> = {}): AlertView => ({
   id: "alert-1", version: 4, status: "open", severity: "warning", policyless: false,
-  banner: { title: "Bedroom too hot", sub: "≥ 30 °C for 60 s", tone: "warn", state: "Acknowledged" },
+  banner: { title: "Bedroom too hot", sub: "≥ 30 °C for 60 s", tone: "warn", state: "Acknowledged" }, next: "Find the cause on site and record it in the work report.",
   cards: [{ kind: "Measured", title: "Sensor reading", value: "30.4 °C", sub: "observed 09:12" }],
   resolution: { info: "Automatic resolution needs a remeasurement", done: null, note: "Recurrence opens a new alert.", forbidden: "You can resolve with a remeasurement only.", ...resolution },
   history: [{ id: "h-1", time: "09:12", title: "Raised", sub: "30.4 °C", badge: { text: "Open", tone: "warn" } }, { id: "h-2", time: "09:14", title: "Notified", sub: "", badge: { text: "Sent", tone: "ok" } }],
@@ -65,6 +65,7 @@ describe("AlertEvidenceView", () => {
     expect(button(/Bedroom too hot/).className).toContain("font-bold");
     expect(button(/Sensor offline/).className).not.toContain("font-bold");
     expect(screen.getByText("Recurrence opens a new alert.")).toBeDefined();
+    expect(screen.getByText("What to do on site: Find the cause on site and record it in the work report.")).toBeDefined(); // IR877
   });
 
   it("shows the empty state without an alert, and no switcher for a single alert", () => {
@@ -169,10 +170,11 @@ describe("AlertEvidenceView", () => {
   });
 
   it("shows a resolved alert's outcome without the resolve form", () => {
-    render(<AlertEvidenceView live={live({ evidence: null }, { status: "resolved" }, { done: "Resolved 09:30 · Airflow restored", info: null })} />);
+    render(<AlertEvidenceView live={live({ evidence: null }, { status: "resolved", next: null }, { done: "Resolved 09:30 · Airflow restored", info: null })} />);
     expect(screen.getByText("Resolved 09:30 · Airflow restored")).toBeDefined();
     expect(screen.queryByRole("button", { name: "Resolve alert" })).toBeNull();
     expect(screen.queryByText("Automatic resolution needs a remeasurement")).toBeNull();
+    expect(screen.queryByText(/What to do on site/)).toBeNull();
   });
 
   it("refuses more than 20 evidence records without calling the API", () => {
