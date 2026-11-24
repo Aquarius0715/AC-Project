@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { recordRows, type ApiOffsetRecord, type ApiQuote } from "@ac/web/lib/offsets";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
@@ -55,7 +55,8 @@ const quote: ApiQuote = {
   expiresAt: "2026-09-22T01:15:00Z", provider: "unselected", scheme: "demo", marketConcept: { stage: "future_concept", providerLabel: "unselected", verificationStatus: "unverified", ledgerStatus: "not_connected" },
 };
 const button = (name: string | RegExp) => screen.getByRole("button", { name });
-const flush = () => new Promise((r) => { setTimeout(r, 0); });
+// inside act, so the state updates the settled action makes (a closed dialog, a toast) render before the checks
+const flush = () => act(() => new Promise<void>((r) => { setTimeout(r, 0); }));
 
 beforeEach(() => {
   nav.patch.mockReset(); nav.toasts = [];
