@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "8d61216bae24cbffeed6f3b179e6061e22cbcc7a5315049389f9bdc489d787e1",
+  "spec_baseline_id": "a080ee3512ec7c7eeafd92911be40257c6ad1141f4eef2910029cd71f5e67180",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -190,15 +190,15 @@
     },
     {
       "path": "03-uiux/UIUXSpecification.md",
-      "sha256": "f68f3ed9656f488afcf351596b7e7901369d89c9d9d4aa393f085138ae3ae2cc"
+      "sha256": "e812e03c78efc34042c1adb91a8ef608378a9a5a12f1a89e2171bdd462fbcf98"
     },
     {
       "path": "03-uiux/component-contracts.csv",
-      "sha256": "0cbc0bf0cd70600760174532f2f39541e8ad4394e8519dd7083627278029feb4"
+      "sha256": "bc4560cfc8a44b4dc6bfbb88fa58414436a50d28f257aa06adf2474ac4949f7e"
     },
     {
       "path": "03-uiux/screen-catalog.csv",
-      "sha256": "dfea2d84fe97228a4874562c0854f7da54eaedbe9ab1c70de0959f6eef988944"
+      "sha256": "f6241fdc1e55094f04e8a58758ea154aac4c91eea76dc731163a4e27827f2aa2"
     },
     {
       "path": "04-agentic-sdlc/README.md",
@@ -310,7 +310,7 @@
     },
     {
       "path": "tools/validate_documents.py",
-      "sha256": "1c1a576bf3ca3853c161c064bbcd5ca2e3ee7126bfa5e3d5998eca374ffc23a4"
+      "sha256": "9a76db85e36bce3b51db47dc5d52d3325f476d1fe730607b04d10e8a8d93de26"
     }
   ]
 }
