@@ -8,10 +8,9 @@ import { useState } from "react";
 import { Banner, Btn, Card, Check, DemoBadge, Field, Input, ListRow, Modal, Page, Steps, SummaryList, Tabs, Timeline, useToast } from "@ac/web/components/ui";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { Icon } from "@ac/web/components/Icon";
-import type { NonEmpty } from "@ac/web/lib/lists";
 
 interface O { id: string; cust: string; kind: string; amt: string; st: string; stage: number; tone: "primary" | "ok" | "warn" | "crit" }
-const seed: NonEmpty<O> = [
+const seed: [O, O, O, O] = [
   { id: "offset-0231", cust: CUSTOMER_A, kind: DEMO_KIND, amt: "1.000", st: "DEMO-CERT-0231 · 09-12 14:20", stage: 4, tone: "ok" },
   { id: "offset-0198", cust: CUSTOMER_A, kind: DEMO_KIND, amt: "2.500", st: "Next: demo retirement · 09-14 10:05", stage: 3, tone: "primary" },
   { id: "offset-0212", cust: "customer-b", kind: "Pilot offset", amt: "0.750", st: "Awaiting demo purchase confirmation", stage: 2, tone: "warn" },
@@ -24,7 +23,7 @@ export function OffsetsDemo() {
   const toast = useToast();
   const [tab, setTab] = useUrlTab<"records" | "market">({ records: "records", market: "market" }, "records");
   const [list, setList] = useState<(typeof seed)[number][]>(seed);
-  const [sel, setSel] = useState(seed[1] ?? seed[0]);
+  const [sel, setSel] = useState(seed[1]); // offset-0198 opens at the retirement step
   const [ack, setAck] = useState(false);
   const [quote, setQuote] = useState(false);
   const [q, setQ] = useState({ cust: "customer-a", amt: "1.0" });

@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 
 // recharts draws nothing at jsdom's zero size: the chart shows what it was given
 vi.mock("@ac/web/components/ui", async (importOriginal) => ({
-  ...await importOriginal<Record<string, unknown>>(),
+  ...(await importOriginal<Record<string, unknown>>()),
   BarChart: ({ labels, series }: Readonly<{ labels: string[]; series: (number | null)[][] }>) => <figure>{`${labels.join(",")}=${series.map((s) => s.join(",")).join(";")}`}</figure>,
 }));
 
