@@ -11074,3 +11074,9 @@ The evidence text IR844 writes ("Device <serial> stopped reporting | lost power 
 2. **The fix.** The four screens use `originOf` as well: `periodic_plan` → Periodic plan, `hq_request` → HQ request, any other origin → Client request.
 3. **Tests.** `overviewView.test.tsx` (technician) badges a plan, an HQ request, a client request and a job without an origin. `jobsView.test.tsx`, `historyView.test.tsx` and `jobView.test.tsx` (partner) show "HQ request" for an `hq_request` job. Each of these fails with the old mapping.
 
+
+## IR860 The documents follow the implementation (2026-11-24)
+
+1. **The decision.** The user asked for no difference between `main`'s implementation and the documents and named the implementation as the source of truth: where they differed, the documents were changed, not the code. Figma stays as it is.
+2. **What changed.** The as-built text of the container, Go backend, architecture, database, network and load-test designs; the screen catalog's operations, queries, result contracts and URL keys, traced from each `page.tsx` through the imported functions; the role design tables and the operation catalog's design IDs; the component contracts' new `as_built` column; the UIUX tokens, navigation and breakpoints; the shared screens, the sign-in and the session (D04, D09, DDC-07, FR-X01); the READMEs; the edge behaviour of the review rounds R1082–R1137, which added no IR. The validators' fixed screen rules follow the same screens.
+3. **What did not.** The IR log keeps its history: an older IR describes the state of its day, and the newest IR on a topic applies (IR72). The Phase 1A acceptance cases (AT-*) keep their demo wording, with the as-built path noted where the sign-in differs.

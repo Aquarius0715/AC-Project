@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "2277d435fabf39c272826301950ce7cc28ca806fbb250038e6ba2f7883bb44bf",
+  "spec_baseline_id": "a0a5e442d2e68d32011cefd5edb0b70d032fde9217792c511f85f13dfa6c2a40",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -78,7 +78,7 @@
     },
     {
       "path": "01-requirements/client.md",
-      "sha256": "78c674fb03920b3c2a9dcb93fddfc418a34406c58b4d2eda4dab066ec9eb5ccf"
+      "sha256": "ce2990c5f20c3dcf2b032d0e3c969ec675c2710e23326c2e3e77d279c025bd34"
     },
     {
       "path": "01-requirements/common.md",
@@ -106,15 +106,15 @@
     },
     {
       "path": "02-design/backend-architecture.md",
-      "sha256": "f330e5fcfe7843e6f0abbe21172cfcbd8e8cfce970b15d26708794efb6d4b073"
+      "sha256": "94b52af0cf846df83491f144955f1870322615e8ea2e1cef358815949029e3bf"
     },
     {
       "path": "02-design/backend-go-design.md",
-      "sha256": "5c5c3c5dec99a08e9c99e2f5e99abd3ce91bcf283e8a1c63d1e08db63d0254b1"
+      "sha256": "545b4f4c49a347a96afb6473a7187bd62d335fd68480f970d6604172114b083e"
     },
     {
       "path": "02-design/client.md",
-      "sha256": "f8533727017e6342b590cddd8270d272f8eb46438a7d72d9adc67ed7f403105b"
+      "sha256": "19d9e5e474a89bc073a7aabab59587212adbfaa467e7f188a366bd2253b66e14"
     },
     {
       "path": "02-design/common.md",
@@ -134,7 +134,7 @@
     },
     {
       "path": "02-design/deterministic-contracts.md",
-      "sha256": "c5f604ff2f4c2a51a9fee127813972628f0ff5e99df4adad6072e438011edf3a"
+      "sha256": "d50be0b44ae311ec74ee83d08893c8c2f5119e2d4e34dd8f6881696d6df0aeed"
     },
     {
       "path": "02-design/device-firmware.ja.md",
@@ -146,7 +146,7 @@
     },
     {
       "path": "02-design/implementation-contracts.md",
-      "sha256": "1b98066a47f14d01ae7e3903c7ea371e56d681b02a80c5b0ef54de57660db7bb"
+      "sha256": "219d01789c29611a4229f9a4ce50231d0d30ac4c93dfe2db8796751d2f337c39"
     },
     {
       "path": "02-design/load-test.md",
@@ -170,7 +170,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "0c7425782720639498d8ddecd920adbe452339b1b25d79fd071a916f5c84cb3e"
+      "sha256": "8d3562ad805604b689c88681d9fb2686c35ee2d072f61f7aec7d609c2a78b623"
     },
     {
       "path": "02-design/service-contracts.ts",
@@ -182,7 +182,7 @@
     },
     {
       "path": "02-design/technician.md",
-      "sha256": "f6dcb27c78b09d0bbdb38f4eb762e061eedceb8a52ac041cbe75df6950afdd2c"
+      "sha256": "81e7d7fad0a041bcf3181251948c9920447db213fff4ea8b5b3d7b10e78f4499"
     },
     {
       "path": "02-design/write-version-catalog.csv",
@@ -294,7 +294,7 @@
     },
     {
       "path": "04-agentic-sdlc/verification.md",
-      "sha256": "27cea0b5f01edfc3fdaefd74f83ef4da0fcf3389706b41f587398521ab610c39"
+      "sha256": "0974ba7b21e33694bda89185d574ce71679534b161c441135e98e7eb073ca5d9"
     },
     {
       "path": "README.md",

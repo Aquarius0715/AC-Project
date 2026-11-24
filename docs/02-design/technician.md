@@ -260,7 +260,7 @@ Scope: FR-T07 / Main display pattern: **UI-DETAIL**. Service boundary: `alerts.l
 3. Record detection, acknowledgement, and resolution times and actors. For recurrence, create a new alertId linked to the previous event.
 4. Queries to update: `alerts / alert events / customer summary / admin summary / audit`.
 
-**Boundary cases and failures**: Job completion alone does not set `resolved`. Automatic resolution through remeasurement applies only to Alerts with a policy; others require manual resolution with a reason (IR66). A URL job whose window has ended (a history snapshot) shows as no job (IR314). Connection loss alone does not prove theft. Treat removal as its own distinct event.
+**Boundary cases and failures**: Job completion alone does not set `resolved`. Automatic resolution through remeasurement applies only to Alerts with a policy; others require manual resolution with a reason (IR66). A URL job whose window has ended (a history snapshot) shows as no job (IR314). Connection loss alone does not prove theft. Treat removal as its own distinct event. As built, a resolution takes at most 20 evidence records ("Pick at most 20 evidence records", refused before any call), and choosing another alert clears the evidence picked for the previous one.
 
 **Verification**: Check the traceability entries under AT-T07 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -347,7 +347,7 @@ Scope: FR-T10 / Main display pattern: **UI-DETAIL** and **UI-FORM**. Service bou
    - As built (IR351, Figma 425:474): a run in `end_failed` offers “Retry end command”, which sends the end action again with `commands.create` as a command of the job; the run stays `end_failed`. Outside the work window, and for `end_blocked`, the card reads “Retry not available — no authorization”. After a completed run, the start button reads “Start new test run”.
 4. Queries to update: `commands / unit detail / audit`. The job's command history is `commands.list` (IR216); the page is opened for one job (`jobId`, from the unit or job page — in progress first, else assigned).
 
-**Boundary cases and failures**: Reject attempts to bypass temperature limits, actions outside the assignment period, test runs of 16 minutes or more, and missing reasons. Follow IR46 for actions under restrictions and IR47 for rejection based on connection/power signals. Do not show stopped without an end acknowledgement. The actions follow the unit's capabilities, ventilation included on a model with a fresh-air function. A URL job whose window has ended answers jobs.get with its history snapshot; it is not the technician's job to control and shows as not found (IR314).
+**Boundary cases and failures**: Reject attempts to bypass temperature limits, actions outside the assignment period, test runs of 16 minutes or more, and missing reasons. Follow IR46 for actions under restrictions and IR47 for rejection based on connection/power signals. Do not show stopped without an end acknowledgement. The actions follow the unit's capabilities, ventilation included on a model with a fresh-air function. A URL job whose window has ended answers jobs.get with its history snapshot; it is not the technician's job to control and shows as not found (IR314). As built, the retry of a failed run end retries the run it is shown for.
 
 **Verification**: Check the traceability entries under AT-T10 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -376,7 +376,7 @@ Scope: FR-T11 / Main display pattern: **UI-LIST**, **UI-FORM**, **UI-DETAIL**. S
 3. Save `Device`, `CalibrationRecord`, and `DeviceOperation`. Update `firmwareVersion` only when the result is `succeeded`. Follow IR67 for queued → running and the connecting display (the equipment scheduler starts and times out operations; the screen refreshes while one is open, IR217). Reject control requests during updates as CONFLICT. Follow D05 for mutual exclusion.
 4. Queries to update: `devices / operations / calibrations / capabilities / audit`.
 
-**Boundary cases and failures**: Reject duplicate serial numbers, unauthorized rebinding to another unit, and unit mismatches, without changing the register. Do not start firmware updates offline. Show `failed` on update failure and keep the old version. As built (IR366): a technician rebinds a bound device only when the unit it leaves also has an assignment of theirs whose work window contains now; otherwise NOT_FOUND, and the device stays.
+**Boundary cases and failures**: Reject duplicate serial numbers, unauthorized rebinding to another unit, and unit mismatches, without changing the register. Do not start firmware updates offline. Show `failed` on update failure and keep the old version. As built (IR366): a technician rebinds a bound device only when the unit it leaves also has an assignment of theirs whose work window contains now; otherwise NOT_FOUND, and the device stays. As built, a device form checks the page it was read with: after a refresh, Register sends only a unit and job still listed, a firmware version no longer offered is not sent, and Calibrate or Update firmware of a device whose assignment ended closes and says the device is read-only.
 
 **Verification**: Check the traceability entries under AT-T11 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 

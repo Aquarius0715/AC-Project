@@ -115,17 +115,17 @@ python3 -B -m unittest discover -s automation/tests -p test_approval_replacement
 
 | 入口 | コードで確認できる機能 |
 |---|---|
-| [`/customer/automations` のページ](../service/web/customer/app/customer/automations/page.tsx#L18) | APIモードでは認証済み顧客の `automations.list`、機器・物件・部屋・設定・位置情報同意を読み、次回の開始を `automations.nextRuns` で取得します。デモモードでは既存の画面用仮データを表示します。 |
-| [ルール一覧の `List`](../service/web/customer/app/customer/automations/_components/automations-view.tsx#L82) と [編集画面の `Editor`](../service/web/customer/app/customer/automations/_components/automations-view.tsx#L172) | ルールの表示・有効化・編集があり、編集時は未保存の予定を `automations.nextRuns` の `draft` でプレビューします。 |
-| [`draftOf`](../service/web/shared/lib/clientAutomations.ts#L287)、[`saveInput`](../service/web/shared/lib/clientAutomations.ts#L313)、[`saveAutomation`](../service/web/customer/app/customer/automations/actions.ts#L24) | 取得した既存ルールから編集値と版を作り、Server Actionが `automations.save` を呼びます。保存はルールの更新で、保存時にエアコンへのコマンドは発行されません。 |
-| [`coreCall`](../service/web/shared/lib/dal.ts#L164) と [Core APIの `save` / `updateAutomation`](../service/api/internal/modules/control/automations.go#L816) | DALが認証・テナント・メンバーシップのヘッダー、書き込みの `Idempotency-Key`、更新の `X-Expected-Version` を設定します。APIが機器や操作の可否を検証し、[`updateAutomation`](../service/api/internal/modules/control/automations.go#L1019) が現在のルール版と照合してから版を進めます。 |
+| [`/customer/automations` のページ](../service/web/customer/app/customer/automations/page.tsx#L20) | APIモードでは認証済み顧客の `automations.list`、機器・物件・部屋・設定・位置情報同意を読み、次回の開始を `automations.nextRuns` で取得します。デモモードでは既存の画面用仮データを表示します。 |
+| [ルール一覧の `List`](../service/web/customer/app/customer/automations/_components/automations-view.tsx#L90) と [編集画面の `Editor`](../service/web/customer/app/customer/automations/_components/automations-view.tsx#L182) | ルールの表示・有効化・編集があり、編集時は未保存の予定を `automations.nextRuns` の `draft` でプレビューします。 |
+| [`draftOf`](../service/web/shared/lib/clientAutomations.ts#L294)、[`saveInput`](../service/web/shared/lib/clientAutomations.ts#L320)、[`saveAutomation`](../service/web/customer/app/customer/automations/actions.ts#L26) | 取得した既存ルールから編集値と版を作り、Server Actionが `automations.save` を呼びます。保存はルールの更新で、保存時にエアコンへのコマンドは発行されません。 |
+| [`coreCall`](../service/web/shared/lib/dal.ts#L159) と [Core APIの `save` / `updateAutomation`](../service/api/internal/modules/control/automations.go#L818) | DALが認証・テナント・メンバーシップのヘッダー、書き込みの `Idempotency-Key`、更新の `X-Expected-Version` を設定します。APIが機器や操作の可否を検証し、[`updateAutomation`](../service/api/internal/modules/control/automations.go#L1052) が現在のルール版と照合してから版を進めます。 |
 
 ### デモ時点の接続案
 
 1. **実データから判定入力を作る。** 認証済み顧客が参照できる機器を基準に、機器ID、タイムゾーン、有効な予定と予定履歴、操作と前後の電源観測を対応付けます。スマホ在宅を使う場合は同意と観測・受信時刻も渡します。現在のルールを曜日別へ展開するとき、Web/APIの曜日は月1〜日7、Pythonは月0〜日6です。水曜はAPIで3、Pythonで2です。開始変更に必要な実測根拠が取得できることを確認してから評価します。
 2. **提案と理由を表示する。** 既存ルール一覧の近くに提案欄を設ける案です。対象エアコン、水曜18:30→20:00、維持する終了時刻と操作設定、根拠となった観測日・件数を表示します。たとえば「直近4回の水曜のうち3日で、20:00前後に手動で電源を入れたことを確認」です。表示値は `cards[].members[].values`、理由と根拠は判定の `reason`・`evidence`、支持日はカードの `support_dates` を参照できます。候補の内部計算値 `candidate_values` と、承認する表示値を区別します。
 3. **水曜の承認を受ける。** サーバーで対象顧客・機器、曜日別の提案ID、表示時の値・根拠、元になったルールIDと版を照合し、承認者・日時・選んだ曜日を記録します。Webの書き込みでは、デモの連番 `proposal_id` をそのまま永続IDとせず、再評価後も承認対象を特定できるIDを決めます。カードのまとめ単位と承認の単位は分け、チェックを外した曜日の変更は作りません。
-4. **承認した変更を既存予定に反映する。** 対象が水曜単独のルールなら、終了時刻・開始/終了アクション・条件などを保ったまま `startLocal` を20:00にして既存の保存経路を使えます。更新には、提案の前提として記録し承認時に再確認した **Automationの `version`** を `expectedVersion` として渡します。これは機器の版やデモの `schedule_versions` の番号とは異なります。Core APIで版が不一致なら `409 CONFLICT`（`error.versionConflict`）です。最新予定と差分を取り直して再提示し、承認の前提を確認してから保存します。成功後は保存されたルールとその有効時点を承認記録に対応付け、承認受付から予定反映までを追えるようにします。 [更新ルートの定義](../service/api/internal/modules/control/swagger_routes.go#L21)
+4. **承認した変更を既存予定に反映する。** 対象が水曜単独のルールなら、終了時刻・開始/終了アクション・条件などを保ったまま `startLocal` を20:00にして既存の保存経路を使えます。更新には、提案の前提として記録し承認時に再確認した **Automationの `version`** を `expectedVersion` として渡します。これは機器の版やデモの `schedule_versions` の番号とは異なります。Core APIで版が不一致なら `409 CONFLICT`（`error.versionConflict`）です。最新予定と差分を取り直して再提示し、承認の前提を確認してから保存します。成功後は保存されたルールとその有効時点を承認記録に対応付け、承認受付から予定反映までを追えるようにします。 [更新ルートの定義](../service/api/internal/modules/control/swagger_routes.go#L22)
 
 ## デモ時点の確認事項
 
@@ -134,6 +134,6 @@ python3 -B -m unittest discover -s automation/tests -p test_approval_replacement
 | 操作履歴と電源観測 | [`commands.list`](../service/api/internal/modules/control/commands.go#L574) には機器ごとのコマンド履歴があり、`source`・要求/応答日時・状態を取得できます。[`units.get` の `observedState`](../service/api/internal/modules/assets/units.go#L20) には電源値と観測時刻があります。コマンドの応答や最新の観測値だけでは、操作前後の電源遷移は確定できません。実環境で、必要な期間の操作履歴と、操作前後それぞれ5分以内の独立した電源観測・受信時刻を取得できるか確認します。リモコン由来の操作、手動と自動の区別、遅延・欠損時の扱いも確認します。 |
 | Pythonの呼び出し方 | サーバー側の定期ジョブ・ワーカーで呼ぶか、内部API経由で再利用するかを決めます。現行CLIはJSONファイルとローカルレポートを使う検証入口です。1世帯・1判定日時の入出力、スキーマの版、再実行とタイムアウト、権限で絞ったデータの受け渡しを設計します。 |
 | 承認・予定版の保存 | 提案の表示内容、承認者、機器・対象曜日、元のルール版、承認順序、適用結果と最初の反映日時をどこに保存するか決めます。予定版を `recorded_at`・`valid_from` 付きで遡れるよう、既存履歴で復元できる範囲も確認します。承認受付とルール更新を別処理にするなら、失敗後の再開と同じ承認の二重反映防止も要件に含めます。既存の `saveAutomation` はDALの既定で呼び出しごとにキーを生成するため、同じ承認を再試行する場合の安定した冪等キーの渡し方を決めます。 |
-| 月〜金18:30のうち水曜だけ承認 | APIの1ルールには共通の `startLocal` が1つあります。元ルールを月・火・木・金 `[1, 2, 4, 5]` の18:30に更新し、水曜 `[3]` の20:00を別ルールとして作成する案があります。元ルールの更新には `id` と版を指定し、新ルールの作成では両方を省きます。終了時刻・アクション・タイムゾーン・条件を引き継ぎ、既存の他ルールや複数台対象を確認します。現行の `automations.save` は1ルールずつ保存するため、分割を一体で更新するAPIを用意するか、途中失敗・重複・欠落に対処する手順を定めるかを決めます。 [ルールの入力型](../service/api/internal/modules/control/automations.go#L351) |
+| 月〜金18:30のうち水曜だけ承認 | APIの1ルールには共通の `startLocal` が1つあります。元ルールを月・火・木・金 `[1, 2, 4, 5]` の18:30に更新し、水曜 `[3]` の20:00を別ルールとして作成する案があります。元ルールの更新には `id` と版を指定し、新ルールの作成では両方を省きます。終了時刻・アクション・タイムゾーン・条件を引き継ぎ、既存の他ルールや複数台対象を確認します。現行の `automations.save` は1ルールずつ保存するため、分割を一体で更新するAPIを用意するか、途中失敗・重複・欠落に対処する手順を定めるかを決めます。 [ルールの入力型](../service/api/internal/modules/control/automations.go#L353) |
 | 承認前に予定が編集された | 表示時に版7の水曜18:30を前提にしていて、別編集で版8になった場合は、古い変更をそのまま適用せず再読込・再判定します。承認受付後の競合もAPIの版チェックで検知し、再提示時に保持する承認記録の扱いを決めます。 |
 | 同時刻に複数の承認が記録された | 同じ機器・水曜の20:00と21:00が同一タイムスタンプなら、どちらを後とするかは時刻だけでは決まりません。現行デモは厳密に後の応答時刻を置き換え条件にしています。Webではサーバー採番や版を使って同一機器・曜日の順序を決めるか、競合として再確認を求めるかを決めます。別機器・別曜日の承認と、既に反映済みの履歴は区別して扱います。 [承認状態の判定](src/approval_state.py#L34) |
