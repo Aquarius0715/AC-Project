@@ -65,7 +65,6 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
     setSource(live.filters);
     setF(live.filters);
   }
-  const [shown, setShown] = useState(5);
   const [selId, setSelId] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const periodProblem = periodError(f, t);
@@ -78,10 +77,10 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
       !f.targetKind || l.targetKind === f.targetKind,
       !f.targetId || l.targetId === f.targetId,
     ].every(Boolean);
-  }).slice(0, shown);
+  });
   const sel = live ? rows.find((r) => r.id === live.selected) ?? null : rows.find((r) => r.id === selId) ?? rows[0] ?? null;
   const total = live ? live.total : rows.length;
-  const isMore = live ? rows.length < live.total && live.filters.limit < 100 : rows.length < seed.length && shown < seed.length;
+  const isMore = !!live && rows.length < live.total && live.filters.limit < 100; // the demo shows its five seed rows at once
 
   // a new search starts from its newest entry; "Filter by …" of the open entry keeps it open (it matches)
   const search = (next: Partial<AuditFilters>, keepEntry = false) => {
@@ -153,7 +152,7 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
                   </ListRow>
                 ))}</div>
               )}
-              <div className="mt-3 flex items-center justify-between gap-2"><p className="text-[11px] text-muted-foreground">{t("{n} of {total} · 25 per page", { n: rows.length, total })}</p>{isMore && <Btn size="sm" onClick={() => { if (live) patch({ limit: String(Math.min(100, live.filters.limit + 25)) }); else setShown((s) => s + 25); }}>{t("Load more")}</Btn>}</div>
+              <div className="mt-3 flex items-center justify-between gap-2"><p className="text-[11px] text-muted-foreground">{t("{n} of {total} · 25 per page", { n: rows.length, total })}</p>{isMore && <Btn size="sm" onClick={() => { patch({ limit: String(Math.min(100, live.filters.limit + 25)) }); }}>{t("Load more")}</Btn>}</div>
             </Card>
             {live?.entryMissing ? <EmptyState title={t("That entry is not in these results")}>{t("Change the filters or load more to open it.")}</EmptyState>
               : sel && (
@@ -182,7 +181,7 @@ export function AuditView({ live }: Readonly<{ live?: AuditLive }>) {
           </div>
         </>
       ) : device && (
-        <DeviceEvents device={device} f={f} periodErr={periodProblem} zone={zone} live={!!live} onDate={changeDate} onDevice={(id) => { if (live) patch({ deviceId: id || null, eventId: null }); }} onEvent={(id) => { if (live) patch({ eventId: id }); }} onReset={reset} />
+        <DeviceEvents device={device} f={f} periodErr={periodProblem} zone={zone} live={!!live} onDate={changeDate} onDevice={(id) => { if (live) patch({ deviceId: id || null, eventId: null }); }} onEvent={(id) => { patch({ eventId: id }); }} onReset={reset} />
       )}
     </Page>
   );
