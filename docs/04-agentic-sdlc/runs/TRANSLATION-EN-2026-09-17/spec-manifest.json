@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "34972e3725a7bff7876574a6bc4464830d9a64ddc19d693716d3b53e02b073d4",
+  "spec_baseline_id": "d838922241da2cd47282bcfa2a54627262e11a7f5c6f5862d5509465c1d9c4b0",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -74,23 +74,23 @@
     },
     {
       "path": "01-requirements/admin.md",
-      "sha256": "f69fdd1fbc77d95e88e3f357f1b8929b7e2e56e5ddce00df8465771c26cb1e02"
+      "sha256": "0adf13b61776b7977a55873ad9c5f7f27e934d6078b20f5833728a574277b72b"
     },
     {
       "path": "01-requirements/client.md",
-      "sha256": "5010f3b8d985e5a28540dafab55b7d91dc2de385ee351819ae257e7f8e952b53"
+      "sha256": "7287080f9bdd9507b76e39807597c43ef7cae1eff117dc7bf140b83612063119"
     },
     {
       "path": "01-requirements/common.md",
-      "sha256": "947c9e41a0b20ad41a31b272a7dca0e07f12954c20292e6375310c7d120a3d79"
+      "sha256": "daad945388617abbbad57ea5ab0cc3674d886c5d75378893df2db6c51f909717"
     },
     {
       "path": "01-requirements/contractor.md",
-      "sha256": "2b9b97a041e9cf108bba344b11477933ccbc8ad17d6ce01649fc4789451a2fed"
+      "sha256": "67d340651d172b0f8fd55e9ac04de48def23bafb98aef6a1e1f0554fb7648b2a"
     },
     {
       "path": "01-requirements/technician.md",
-      "sha256": "b4bae0c16c7e448ab59138e2707643b476d011ca7ab3f6cd0dd8c5d6deeadbf3"
+      "sha256": "aaa8bbe27ba0dd8ccd60bcfb9d11c06e8147bbf34e80050b21fffddab85f9af8"
     },
     {
       "path": "01-requirements/use-case-catalogue.csv",
@@ -118,7 +118,7 @@
     },
     {
       "path": "02-design/common.md",
-      "sha256": "5d85921db5279156bebda8530f8f6d105bb7ff5591557d289e8df0c5e9867eb2"
+      "sha256": "80723561bbaf51c68a876611e04fbfcce740941af16d42938cf05ee0b5396332"
     },
     {
       "path": "02-design/container-design.md",
@@ -146,7 +146,7 @@
     },
     {
       "path": "02-design/implementation-contracts.md",
-      "sha256": "219d01789c29611a4229f9a4ce50231d0d30ac4c93dfe2db8796751d2f337c39"
+      "sha256": "fe9fe2e88a2916dbe971c98b40fa4a37e3efea77d1a0656100081b1398f551a3"
     },
     {
       "path": "02-design/load-test.md",

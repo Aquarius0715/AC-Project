@@ -164,6 +164,8 @@ Return only fields needed by each role, even for the same entity. Do not send al
 | RATE_LIMITED | Show waiting time and retry guidance | Show mock retryAfterSeconds. Keep form inputs as usual. As built (IR375): the action's line reads “Too many changes in a short time — try again in N s” from `retryAfterSeconds`. Since IR380 every screen's refusal text falls back to this shared wording, never the raw code and key. Group control waits the seconds and sends again |
 | UNAVAILABLE | Show an in-screen error and allow retry | Automatically retry reads at most twice. Retry writes only on explicit user action |
 
+As built (IR257, IR269, IR380, IR385, IR717): a page's reads run in its Server Component through the DAL, which retries nothing (D04); a failed read shows the route's error state with Retry, a read refused as FORBIDDEN on an HQ page names the permission the role lacks (IR582), and a target that is not found shows the not-found page. A write is a Server Action that returns `{ ok: false, code, messageKey, fieldErrors, retryAfterSeconds }` instead of throwing; `useAction` turns it into one toast line in the display language (`actionMessage`), and a form also shows the field errors under their fields and focuses the first one (IR620). UNAUTHENTICATED (a 401 from the Core API: the session ended, or HQ signed the user out everywhere) drops the stored session: a write then opens the sign-in page with a return address, and the next page asks to sign in. RATE_LIMITED says “Too many changes in a short time — try again in N s”. An action that gets no answer at all reads as UNAVAILABLE. The screens do not look up `writes.getResult` after a TIMEOUT (the operation is there for API clients), and the simulated network loss (`errors.network_disconnected`) is not built: the apps have no subscription to stop.
+
 Follow IR83 for refreshing/failure after successful data and for batching subscription invalidations. Never replace KPI values with zero or healthy values on errors. If keeping previous values, mark stale and show last-success time. Do not keep them after target or role changes.
 
 ## DDC-04 Asynchronous and Mock Execution Rules
@@ -175,12 +177,12 @@ This section and DDC-01 define demo timing, limits, counts, and periods. If requ
 | Mock wait timeout | 10 seconds. Normal read wait is fixed at fixture.defaultWaitMs=300 ms (IR74). Control tests with an injected clock |
 | Command expiry | 30 seconds after request (fictional demo value). Scenario events control sending and acknowledgement |
 | Telemetry stale | Per sensor; seed: 120 seconds. Stale when now − observedAt > staleAfterSeconds |
-| Offer expiry | Seed: 24 hours later. Accept only while now < offerExpiresAt. Unanswered expiry returns the job to requested (IR48) |
+| Offer expiry | Seed: 24 hours later. Accept only while now < offerExpiresAt. Unanswered expiry returns the job to requested (IR48). As built HQ enters offerExpiresAt with the offer: in the future, not after the access end nor after the last candidate start (IR457) |
 | Notice period | Seed rule: 24 hours; executeAfter >= noticeAt + 24 hours. Not a commercial rule |
 | OffsetQuote validity | Demo: 15 minutes. Request requires now < expiresAt |
-| Write processing | Shared-memory transition functions check input/version, then update state and display history together. No database transactions are designed |
-| Invalidate | Invalidate affected entities and related summaries using scoped Query keys. Do not manually copy data in UI |
-| Role change | Abort pending requests and remove old Queries. Fetch the new-scope session before rendering. Discard late responses using IR17 Repository instance/generation and viewEpoch |
+| Write processing | Shared-memory transition functions check input/version, then update state and display history together. No database transactions are designed. As built (API mode) each write runs in one Core API database transaction with its event and audit record ([backend Go design](backend-go-design.md)) |
+| Invalidate | Invalidate affected entities and related summaries using scoped Query keys. Do not manually copy data in UI. As built there is no query cache: the page reads everything again after a write (common design §6) |
+| Role change | Abort pending requests and remove old Queries. Fetch the new-scope session before rendering. Discard late responses using IR17 Repository instance/generation and viewEpoch. As built each role is its own app with its own session (IR790); the Core API reads the membership on every request |
 | Reload/reset | Follow DEC-07. Reload restores seed. Role switches preserve tab business data. Reset initializes clock/object URLs and increments generation by 1 |
 
 For normal customer/diagnostic Commands, reject conflicting new requests while the same unit has an unfinished request. Post-payment release is separate coordination: keep release intent, then use D03 per-unit evidence to distinguish undelivered, unapplied, applied, and unknown results. Send release Commands only for applied units; confirmed unapplied units are not_required. Never send apply and release concurrently while unresolved.

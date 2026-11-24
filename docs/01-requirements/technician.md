@@ -63,6 +63,8 @@ Real device control, external notifications, payments, and API authentication be
 
 The table above is an index. The following sections explain entry conditions, steps, results, and acceptance criteria for each requirement.
 
+As built (2026-11-24): the acceptance cases below are written against the Phase 1A demo (`demoSeed`, /demo events, `acceptancePatches`). In API mode the device answers come from the IoT simulator or a live device through the bridge, /demo offers only a device's connection loss and restoration, the session expiry and the Core API scenario, and the data is reset with `make resetdb`; the Go integration and end-to-end tests check the same behaviour against the Core API (verification plan). Where a case's expected code differs from the Core API, the case says so.
+
 Numbers ①②… in acceptance cells identify observations within that cell. Match independent Given conditions to Then results by meaning; do not confuse multiple assertions with case IDs. D01's cause-based priority table determines one failure code.
 
 Use the fixed fixtures named in the [verification plan](../04-agentic-sdlc/verification.md).
