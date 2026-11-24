@@ -219,8 +219,8 @@ func inScope(p *ops.Principal, unit, property, org uuid.UUID) bool {
 //	@Description	selected unit (owner only); a command asked for here is always source ui (the voice channel was \
 //	@Description	withdrawn, IR648)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-//	@Description	Design: DD-C03, DD-T10, DD-A11 through automations.fire, DD-C04, DD-C05, DD-A02, DD-C14 · Input \
-//	@Description	versions: expectedUnitVersion=UnitDetail.version
+//	@Description	Design: DD-C03, DD-T10, DD-A11 through automations.fire, DD-C04, DD-C05, DD-C14 · Input versions: \
+//	@Description	expectedUnitVersion=UnitDetail.version
 //	@Tags			commands
 //	@Accept			json
 //	@Produce		json
@@ -441,7 +441,7 @@ func (in *GetInput) Validate() map[string]string {
 //	@Description	admin:restriction.override | admin:automation.policy.read
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-A09, DD-A12, DD-C03, DD-C12, DD-T10, DD-A02, DD-A16, DD-C14
+//	@Description	Design: DD-A09, DD-A12, DD-C03, DD-C12, DD-A16, DD-C14
 //	@Tags			commands
 //	@Accept			json
 //	@Produce		json

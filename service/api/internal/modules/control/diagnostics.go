@@ -317,7 +317,7 @@ func (in *RunIDInput) Validate() map[string]string {
 //	@Description	Authorization: technician:control.diagnose:assigned-history | admin:job.read | admin:control.execute
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-T10, DD-A02
+//	@Description	Design:
 //	@Tags			diagnosticRuns
 //	@Accept			json
 //	@Produce		json
@@ -384,7 +384,7 @@ func (in *RunListInput) Validate() map[string]string {
 //	@Description	Authorization: technician:control.diagnose:assigned-history | admin:job.read | admin:control.execute
 //	@Description	Validation: D01; SR08/SR09
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-T10, DD-A02 · Query: filters none · sort id,createdAt (default createdAt desc;id asc)
+//	@Description	Design: DD-T10 · Query: filters none · sort id,createdAt (default createdAt desc;id asc)
 //	@Tags			diagnosticRuns
 //	@Accept			json
 //	@Produce		json

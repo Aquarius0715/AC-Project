@@ -24,6 +24,7 @@ As built (IR257; the Next.js 16 guides, IR175–IR178, IR199 onwards). `service/
 ```text
 service/web/
   customer/ partner/ technician/ admin/   one app each: routes, the role layout, proxy.ts, Server Actions
+  portal/         the page that lists every service address, without sign-in or data (IR791)
   shared/ (@ac/web)
     components/   AppShell, ui primitives (Tailwind CSS 4, Figma UI Guideline tokens), shared parts (JobBits, QrScan …)
     lib/          dal.ts (server-only data access), session, rest + routes.gen (Core API REST routes from the catalog),
@@ -31,7 +32,8 @@ service/web/
                   and the result types are checked against it, IR314),
                   pure mappers and validators per screen (Vitest), URL state, the Phase 1A demo stores
     screens/      shared screens: sign-in, notifications, preferences, demo, page unavailable
-    bff/          Route Handlers: OIDC sign-in, callback and sign-out; /bff/ops for interactive reads; session
+    bff/          Route Handlers: OIDC sign-in, callback and sign-out; /bff/ops for interactive reads; session; /bff/version
+                  (the build an open page compares with, IR856)
   e2e/            Playwright end-to-end tests against the local stack (IR252–IR256)
 ```
 
@@ -56,9 +58,9 @@ Forms and translation are still the build's own; they move to React Hook Form wi
 
 **Language — built for every business screen (IR258–IR306).** FR-X01 asks that a language change reach key screens, notifications and dates.
 - These show the saved language: the shell, a failed Server Action's toast, each route's loading and error states, Preferences, Demo controls, the notifications inbox and every customer screen (AT-X01-N) — overview, units & locations (with group control), automations, alerts (inbox and policies), maintenance (requests and Filter care), energy & cost with carbon offsets, air quality, contracts & payments with the invoice page, users and the unit screen — and the contractor overview, job list, offer / job page, quality review, schedule, team & capacity with its certifications, job history, payouts and the unit view — every contractor screen — and the technician overview with its QR scan, job workspace, unit screen, alert evidence, diagnostic control and devices with their events — every technician screen — and the HQ overview, maintenance jobs with their plans, contractors and SLA tabs, the alerts with their policies, customers & units with warranty & coverage, the device registry, the energy analysis, the MRV workspace, the offset demo, billing with contractor payouts, contracts, restrictions with their exception screen, access & roles, automation policies and the audit log — every business screen.
-- Every page declares the display language as its language (`<html lang>`, `en`, `ms` or `ja`): the root layout reads it on the server, the language chosen on the sign-in page before sign-in, English when none was (WCAG 3.1.1, IR489, IR646).
+- Every page declares the display language as its language (`<html lang>`, `en`, `ms`, `ja` or `id`, IR639, DEC-108): the root layout reads it on the server, English before sign-in (WCAG 3.1.1, IR489; the pre-sign-in language choice went with IR790, the identity provider's page has its own).
 - Every page is titled with its name in the display language, "<page> — AC Project" (the shell's menu item for the path, the shared pages, Users and Demo controls; `documentTitle` in `lib/nav.ts`). The root layout titles the first load on the server from the path the proxy passes, and the shell titles each client-side navigation (WCAG 2.4.2, IR490).
-- The English text is the key of the Malay dictionary (`shared/lib/i18n-ms.ts`, a draft not yet reviewed). A text without an entry stays English. When one English text means two things, its key names the context before `::` ("tamper::Clear" is a state, "Clear" a button); English shows the text after it (IR287).
+- The English text is the key of the Malay, Japanese and Indonesian dictionaries (`shared/lib/i18n-ms.ts`, `i18n-ja.ts` and `i18n-id.ts`, drafts not yet reviewed; IR639, DEC-108). A text without an entry stays English. When one English text means two things, its key names the context before `::` ("tamper::Clear" is a state, "Clear" a button); English shows the text after it (IR287).
 - Their times follow IR44: the user's language and display time zone, with the zone's abbreviation (`showTime` / `showClock`). Times on the days next to now show "today", "yesterday" or "tomorrow" instead of the date (`relativeTime`). Business days stay in Asia/Kuala_Lumpur, where they are cut, and the screens say so: the periods of the overview and the energy screens, the 7-day air-quality window, contract periods and invoice due dates (HQ billing and contracts too, with the payout pay dates), the contractor's timeline, team weeks, free hours and unavailable days, the technician's today and its timeline, a follow-up visit date, a unit's 7-day period, HQ's classify-by business day, the contractor register's dates, and a unit's installation and warranty dates (named when the display time zone is another one), and HQ's energy analysis, baseline, MRV report and offset quote periods, which HQ also types in Kuala Lumpur time (IR296–IR298). Booked and preferred times show as one span (`showSpan`), and the times users type — preferred and proposed times, an offer's expiry and access window, an extended work or access end, a plan's next date, an SLA target's start, a firmware campaign's start, a restriction's execute-after and a grace or exception end, a membership's valid period, the audit log's period days — are read in the display time zone (`zonedInstant`, NFR-08).
 - Still English: the Phase 1A browser demo's fixture screens.
 
@@ -70,7 +72,7 @@ The stack is TypeScript (strict mode), React 19 and Next.js 16 App Router (DEC-6
 
 | Route | Responsibility |
 |---|---|
-| /login | With an identity service (API mode): the service's name, an e-mail address and Continue to the identity provider's pages for the password, the one-time code and a reset; the display language is chosen here (IR646). The browser demo build selects a fictional account and says that this is not real authentication |
+| /login | With an identity service (API mode): goes straight on to the identity provider's one sign-in screen through `/bff/auth/login?returnTo=…` (e-mail address and password on one page, its own language choice, the one-time code for HQ, a reset, IR790). Only a sign-in that came back with `?error=`, or just after sign-out, stops on the app's page with the reason and a Sign in button. The browser demo build has no identity service: Continue opens the app and the page says that this is not real authentication |
 | /forgot-password | Browser demo: check the email format, then show a message that does not reveal whether the email exists; sending is a preview only. With an identity service the address goes to /login, and the identity provider resets the password by e-mail (IR646) |
 | /settings/preferences | Language, display timezone, read-only demo currency MYR, consent settings (client only), monthly report email (client), and Security › two-step verification (demo, FR-X08, IR112; in the HQ app Required, with nothing to turn on or off, DEC-85, IR510) |
 | /notifications | List notifications within the user's scope and manage read status. Keep this separate from business state |
@@ -117,7 +119,7 @@ The schema distinguishes null (no value) from “not registered.” Treat unknow
 | Telemetry | unitId、sensorId、metric、value:number\|null、unit、observedAt、receivedAt、origin(measured/estimated/inspection)、quality(valid/missing/stale/suspect)、isDemo |
 | Command | unitId, actorId, action:UnitAction or internal RestrictionAction, diagnosticRunId?, status, requestedAt, sentAt?, acknowledgedAt?, expiresAt, failureCode?, idempotencyKey(key to prevent duplicates), expectedVersion, correlationId |
 | Alert | unitId, type, severity(critical/warning/normal), status, evidenceIds[], detectedAt, acknowledgedAt?, resolvedAt?, resolutionReason?. normal is also used in health summaries. Do not change an open alert to normal without a valid basis |
-| MaintenanceJob | unitId、alertIds[]、type(periodic/reactive/preventive)、origin(client_request/periodic_plan)、status、contractorOrgId?、assignmentId?、requestedSlot、preferredSlots[]、slotProposal?、partnerSlotProposal?、scheduledSlot?、dueAt、reportVersion?、draftReportRef?、costs[] |
+| MaintenanceJob | unitId、alertIds[]、type(periodic/reactive/preventive/installation, DEC-106)、origin(client_request/periodic_plan/hq_request)、status、contractorOrgId?、assignmentId?、requestedSlot、preferredSlots[]、slotProposal?、partnerSlotProposal?、scheduledSlot?、dueAt、reportVersion?、draftReportRef?、costs[] |
 | WorkReport / InspectionItem / Attachment | jobId, authorId, version, items[], measurements[], replacementParts[], workText, nextAction, submittedAt? / componentGroup, componentKey, result, reason?, evidenceIds[] / jobId, reportId, blobId, name, mime, size, status(previewUrl is created only in the screen) |
 | Contract / Invoice / Payment | customerOrgId、unitIds[]、planType、period、rulesVersion / contractId、amountMinor、currency、dueAt、status / invoiceId、amountMinor、method?、status、externalRef?、confirmedAt? |
 | Restriction | contractId、causeInvoiceIds[]、unitIds[]、rulesVersion、noticeAt、executeAfter、reason、policy、state、applyCommandIds[]、releaseCommandIds[]、exception?、graceUntil? |

@@ -1234,7 +1234,7 @@ func (in *PayoutIDInput) Validate() map[string]string {
 //	@Description	Authorization: admin:billing.read | contractor:own-company:approved-or-paid
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-A23, DD-P10
+//	@Description	Design: DD-A23
 //	@Tags			payouts
 //	@Accept			json
 //	@Produce		json
