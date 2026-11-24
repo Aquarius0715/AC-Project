@@ -71,6 +71,8 @@ Real device control, external notifications, payments, and API authentication be
 
 The table above is an index. The following sections detail entry conditions, steps, results, and acceptance criteria. Numbers ①②… in acceptance cells identify subcases in order (for example AT-C01-E.01); matching Given/Then numbers are paired. Use fixed fixtures from the [verification plan](../04-agentic-sdlc/verification.md). Thresholds and detailed operating rules absent from the original are 1A proposals under DEC-09, not confirmed production rules.
 
+As built (2026-11-24): the acceptance cases below are written against the Phase 1A demo (`demoSeed`, /demo events, `acceptancePatches`). In API mode the device answers come from the IoT simulator or a live device through the bridge, /demo offers only a device's connection loss and restoration, the session expiry and the Core API scenario, and the data is reset with `make resetdb`; the Go integration and end-to-end tests check the same behaviour against the Core API (verification plan). Where a case's expected code differs from the Core API, the case says so.
+
 ### FR-A01 Overall dashboard
 
 - **Company request basis**: SRC-06 BIZ-04, BIZ-08 — Visual dashboards for customers, internal/external technicians, and administrators/HQ; prompt fault detection/notifications before or at occurrence.
@@ -84,8 +86,8 @@ The table above is an index. The following sections detail entry conditions, ste
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-A01-N | hq-operator. Apply fixture-contract.json `acceptancePatches["AT-A01-N"]` (IR85) to demoSeed: tenant-a has two ON, two OFF, one unknown unit; two active customers and overdue unpaid 120.00MYR remain as seeded. When: Open `/admin` for today, follow unit KPI to list | ① 50.0% operation rate, denominator four; also show five total/one unknown ② Customer count 2 ③ Unpaid 120.00MYR ④ List URL contains scope/selected powerState, not period; Back restores period ⑤ Savings card labeled “Estimate (prorated assumed baseline, demo)” (IR78) |
-| AT-A01-E | Open totals with ① Unknown units ② Unpaid MYR and USD ③ Zero units | Show unknown separately, exclude from rate denominator. Sum MYR/USD separately. Zero-unit rate is “Cannot calculate (null).” |
+| AT-A01-N | hq-operator. Apply fixture-contract.json `acceptancePatches["AT-A01-N"]` (IR85) to demoSeed: tenant-a has two ON, two OFF, one unknown unit; two active customers and overdue unpaid 120.00MYR remain as seeded. When: Open `/admin` for today, follow unit KPI to list | ① 50.0% operation rate, denominator four; also show five total/one unknown ② Customer count 2 ③ Unpaid 120.00MYR ④ List URL contains scope/selected powerState, not period; Back restores period ⑤ Savings card labeled “Forecast (prorated assumed baseline, demo)” as built (IR78) |
+| AT-A01-E | Open totals with ① Unknown units ② Unpaid MYR and USD ③ Zero units | Show unknown separately, exclude from rate denominator. Sum MYR/USD separately. Zero-unit rate is null, shown as “Cannot calculate”. |
 | AT-A01-B | ① After `acceptancePatches["AT-A01-N"]`: ON2/OFF2/unknown1 ② Mixed active/inactive customers ③ Overdue unpaid invoices | ① 50%, unknown1 shown ② Count only active ③ Determine from unpaid amount |
 
 Design: [DD-A01](../02-design/admin.md#dd-a01-details). Assess parent AT-A01 using all N/E/B and applicable SRC/R01 cases in traceability.
