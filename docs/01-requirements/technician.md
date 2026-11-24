@@ -353,14 +353,14 @@ Design: [DD-T14](../02-design/technician.md#dd-t14-details). Assess parent AT-T1
 
 - **Company request basis**: SRC-06 BIZ-12; Figma-confirmed Technician 02-31 (2026-10-01).
 - **Entry conditions**: Draft report of an in-progress job.
-- **Main flow**: Get signature (or prompted on Submit) → summary of job, work, parts, time on site → signer name and signature → Confirm; or “Customer not present” → reason + site photo.
+- **Main flow**: Get signature (or prompted on Submit) → summary of job, work, parts, time on site → signer name and signature → Save sign-off; or “Customer not available” → reason + site photo.
 - **Business rule BR-T15**: `reports.signOff` attaches the sign-off to the current draft report version; editing the draft afterwards invalidates it (badge returns to “Not signed”). Submitting without a sign-off shows a warning; when the customer is absent the reason is required. The sign-off confirms on-site work only; the customer still confirms and rates after HQ accepts the report (FR-C17).
 - **Resulting business state**: WorkReport.signOff set with reportVersion.
 - **Boundaries/prohibitions**: Neither signature nor absence reason with photo → VALIDATION.
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-T15-N | Draft v2 of job-contractor-a. When: signer “Tan Mei Ling (customer-a)” signs and confirms | signOff.reportVersion=2, badge “Signed 11:38” |
+| AT-T15-N | Draft v2 of job-contractor-a. When: signer “Tan Mei Ling (customer-a)” signs and confirms | signOff.reportVersion=2, “Signed · Tan Mei Ling (customer-a) · 11:38” |
 | AT-T15-E | Confirm with an empty pad and no absence reason | VALIDATION |
 | AT-T15-B | Edit the draft after signing | New draft version; signOff cleared; Submit warns “Not signed” |
 

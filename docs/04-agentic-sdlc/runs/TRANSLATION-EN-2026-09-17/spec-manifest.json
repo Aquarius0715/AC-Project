@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "3cbb3d3a99150221e4a3bc8994dcfffeb19d20f89eed0a27cf1faa62df365927",
+  "spec_baseline_id": "aca78015144f822c042fc1b8a88e9cf99bc1c6b016edeca9f8a004d3114e93d9",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -78,7 +78,7 @@
     },
     {
       "path": "01-requirements/client.md",
-      "sha256": "ce2990c5f20c3dcf2b032d0e3c969ec675c2710e23326c2e3e77d279c025bd34"
+      "sha256": "cf0aff9ad10eef3e25b49860798deb559398044bea00859f9efd600474e716c5"
     },
     {
       "path": "01-requirements/common.md",
@@ -90,7 +90,7 @@
     },
     {
       "path": "01-requirements/technician.md",
-      "sha256": "e53898c07fe0f11ccb1042dc292a056208c3f0f1df79767d4c53d02676628f78"
+      "sha256": "b4bae0c16c7e448ab59138e2707643b476d011ca7ab3f6cd0dd8c5d6deeadbf3"
     },
     {
       "path": "01-requirements/use-case-catalogue.csv",
@@ -134,7 +134,7 @@
     },
     {
       "path": "02-design/deterministic-contracts.md",
-      "sha256": "d50be0b44ae311ec74ee83d08893c8c2f5119e2d4e34dd8f6881696d6df0aeed"
+      "sha256": "d86b75a73dc1216b4449f42d65d1a6a7e2740b606aec4f218b4adfb951aca9b9"
     },
     {
       "path": "02-design/device-firmware.ja.md",

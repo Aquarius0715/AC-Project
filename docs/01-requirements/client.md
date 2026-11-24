@@ -86,8 +86,8 @@ Detailed thresholds and operating rules absent from the company original are pha
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-C01-N | customer-a; property-home-a contains unit-online-rto (power ON, room 28.0°C, humidity 60%, last observation 00:59:30Z) and unit-non-rto (power OFF). Both connection=online; power observations/latest power Measurements meet fixture.powerClassification fresh conditions. One open alert. When: Open `/customer?propertyId=property-home-a&period=today`, follow running card to list, then Back | ① “Running 1 / Stopped 1 / Unknown 0,” one alert. With no unit selected, temperature says “Select a unit,” without an average ② Power card asOf=00:59:30Z ③ Destination `/customer/properties?propertyId=property-home-a&powerState=on` (IR50), without period; Back restores original period too ④ Zero Repository writes |
-| AT-C01-E | ① simulator=false; latest sensor-online-power value=null, quality=missing ② Open `/customer?unitId=unit-other-customer` ③ units.list UNAVAILABLE | ① “Running 0 / Stopped 1 / Unknown 1,” no addition to normal count ② NOT_FOUND/unavailable target; return neither other-customer data nor successful zero totals ③ KPI error/retry; do not show zero or previous values as normal |
+| AT-C01-N | customer-a; property-home-a contains unit-online-rto (power ON, room 28.0°C, humidity 60%, last observation 00:59:30Z) and unit-non-rto (power OFF). Both connection=online; power observations/latest power Measurements meet fixture.powerClassification fresh conditions. One open alert. When: Open `/customer?propertyId=property-home-a&period=today`, follow running card to list, then Back | ① “Running 1 · Stopped 1 · Unknown 0,” one alert. With no unit selected, temperature says “Select a unit,” without an average ② Power card asOf=00:59:30Z ③ Destination `/customer/properties?propertyId=property-home-a&powerState=on` (IR50), without period; Back restores original period too ④ Zero Repository writes |
+| AT-C01-E | ① simulator=false; latest sensor-online-power value=null, quality=missing ② Open `/customer?unitId=unit-other-customer` ③ units.list UNAVAILABLE | ① “Running 0 · Stopped 1 · Unknown 1,” no addition to normal count ② NOT_FOUND/unavailable target; return neither other-customer data nor successful zero totals ③ KPI error/retry; do not show zero or previous values as normal |
 | AT-C01-B | ① room-1=28.0°C, room-2=24.0°C, no unit selected ② Select unitId for room-1's unit ③ Change period=7d | ① No representative temperature (26.0°C absent) ② Room 28.0°C and observation time ③ Energy integrated over seven-day [from,to); current power keeps latest observation time |
 
 Design: [DD-C01](../02-design/client.md#dd-c01-details). Assess parent AT-C01 using all N/E/B and applicable SRC/R01 cases in traceability.
@@ -209,7 +209,7 @@ Alongside CO₂, dust, and humidity, show whether allergen data is available and
 |---|---|---|
 | AT-C07-N | room-1: CO₂=1000ppm, PM2.5=12µg/m³, temperature 28°C, humidity 60%. When: Display → Log ventilation (window opened, 15 min) → save | ① Four separate series with units ② “Ventilation recommended” (co2≥1000ppm, IR99) ③ One VentilationLog with co2AtLog=1000 ppm, zero Commands ④ CO₂ remains 1000ppm; no assumed reduction |
 | AT-C07-E | Display unit-online-rto CO₂=null, PM2.5=12µg/m³ / Log ventilation with duration 0 or 241 min | CO₂ not measured; PM2.5 12µg/m³; “No current advice” (IR99). Duration VALIDATION, input kept, zero logs. |
-| AT-C07-B | unit-online-rto: ① humidity=0 ② humidity=null ③ View unit-non-rto without a fresh-air function ④ CO₂=999ppm, PM2.5=12 ⑤ CO₂=1000ppm ⑥ PM2.5=35µg/m³ ⑦ Both CO₂/PM2.5 null | ① “0%” ② “Not measured” ③ Manual ventilation guidance; Log ventilation still available ④ “No current advice” ⑤ “Ventilation recommended” ⑥ “Filter cleaning/inspection recommended” ⑦ “Not enough data for advice” (IR99) |
+| AT-C07-B | unit-online-rto: ① humidity=0 ② humidity=null ③ View unit-non-rto without a fresh-air function ④ CO₂=999ppm, PM2.5=12 ⑤ CO₂=1000ppm ⑥ PM2.5=35µg/m³ ⑦ Both CO₂/PM2.5 null | ① “0%” ② “Not measured” ③ Manual ventilation guidance; Log ventilation still available ④ “No current advice” ⑤ “Ventilation recommended” ⑥ “Filter cleaning and inspection recommended” ⑦ “Not enough data for advice” (IR99) |
 
 Design: [DD-C07](../02-design/client.md#dd-c07-details). Assess parent AT-C07 using all N/E/B and applicable SRC/R01 cases in traceability.
 
@@ -266,12 +266,12 @@ Design: [DD-C09](../02-design/client.md#dd-c09-details). Assess parent AT-C09 us
 - **Entry conditions**: Zero or more own-organization contracts. Viewing requires no payment action.
 - **Main flow**: Select contract → check units/period/plan → view amount/deadline/receipt state → invoice details.
 - **Business rule BR-C10**: Contract expiry does not mean unit unavailability. Invoice overdue status depends on due date and unpaid balance. Processing is not paid.
-- **Resulting business state**: Read-only. Only customers with zero contracts see “No contract / General maintenance” with a monitoring link. Show type/period/invoices for general/energy/environment contracts (IR61).
+- **Resulting business state**: Read-only. Only customers with zero contracts see “No contract — general maintenance” with a monitoring link. Show type/period/invoices for general/energy/environment contracts (IR61).
 - **Boundaries/prohibitions**: Customer A cannot retrieve customer B's invoiceId. Paid invoices have no start-payment button.
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-C10-N | contract-rto-a (unit-online-rto, planType=rto), invoice-overdue-a 120.00MYR, dueAt=2026-09-10, unpaid. When: Select contract → invoice details; also open as customer-b with zero contracts | ① Contract/unit link ② 120.00 MYR, deadline, unpaid/overdue ③ Navigate to invoice details ④ customer-b sees “No contract / General maintenance” and monitoring link |
+| AT-C10-N | contract-rto-a (unit-online-rto, planType=rto), invoice-overdue-a 120.00MYR, dueAt=2026-09-10, unpaid. When: Select contract → invoice details; also open as customer-b with zero contracts | ① Contract/unit link ② 120.00 MYR, deadline, unpaid/overdue ③ Navigate to invoice details ④ customer-b sees “No contract — general maintenance” and monitoring link |
 | AT-C10-E | ① customer-a opens cust-b invoice-general-b from `acceptancePatches["AT-C10-E.1"]` ② Open invoice-overdue-a after hq-operator records full payment using payments.recordManual | ① NOT_FOUND ② No start-payment button |
 | AT-C10-B | invoice-overdue-a: ① Just after reset set clock to dueAt (2026-09-10T00:00Z, IR36) ② dueAt+1ms ③ customer-a payments.simulate(initiate→processing) ④ After recordManual ⑤ unit-online-rto after patching contract-rto-a.endAt to 2026-09-13T00:00Z | ① Not overdue ② Overdue ③ Processing, not paid ④ paid ⑤ Monitoring/control available |
 
