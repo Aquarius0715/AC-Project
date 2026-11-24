@@ -2,7 +2,7 @@
 const TEXT_40_0_KGCO_E = "40.0 kgCO₂e";
 
 import { useState } from "react";
-import { Banner, Btn, Card, DataTable, Field, Input, ListRow, Modal, Page, Select, SummaryList, Tabs, Textarea, useToast, cx } from "@ac/web/components/ui";
+import { Banner, Btn, Card, DataTable, Field, Input, ListRow, Modal, Page, Select, SummaryList, Tabs, useToast, cx } from "@ac/web/components/ui";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { Icon } from "@ac/web/components/Icon";
 import { nonEmpty } from "@ac/web/lib/lists";
@@ -20,8 +20,7 @@ export function MRVDemo() {
   const [sel, setSel] = useState(reports[0]);
   const [versionNumber, setVersionNumber] = useState(1);
   const [cmp, setCmp] = useState(false);
-  const [review, setReview] = useState("Inputs match the pilot agreement; demo only.");
-  const [reviewed, setReviewed] = useState(true);
+  const review = "Inputs match the pilot agreement; demo only."; // the fixture report is already demo reviewed
   const [nw, setNw] = useState(false);
   const [f, setF] = useState({ cust: "org-customer-a", start: "2026-09-14T08:00", end: "2026-09-14T09:00", unit: "unit-online-rto" });
   const [prev, setPrev] = useState(false);
@@ -39,7 +38,7 @@ export function MRVDemo() {
             </Card>
             <Card title="Calculation conditions (snapshot)"><SummaryList items={[["Customer", "org-customer-a"], ["Sites / units", "Home A · unit-online-rto"], ["Period", "2026-09-14 08:00–09:00 (Asia/Kuala_Lumpur)"], ["Boundary", "ac_input_electricity — AC input electricity only"], ["Baseline", "baseline-energy-100 v1 · demo_fixed · 100.0 kWh"], ["Emission factor", "factor-demo-2026 v1 · Demo region (fictional) · 2026 · 0.5 kgCO₂e/kWh"], ["Factor source", "1A demo fixed; not a real regional factor"]]} /><p className="mt-2 text-[11px] text-muted-foreground">Snapshots are stored with the report. Later changes to the baseline or factor do not change this version.</p></Card>
             <Card title="Evidence"><ul className="list-disc pl-5 text-[13px]"><li>m-online-kwh-0800-0900 · measured</li><li>baseline-energy-100 v1 snapshot</li><li>factor-demo-2026 v1 snapshot</li></ul></Card>
-            <Card title="Demo review">{reviewed ? <><p className="text-[13px]">“{review}”</p><p className="text-[11px] text-muted-foreground">hq-operator · version {versionNumber} · 2026-09-14 10:05</p><p className="mt-1 text-xs text-muted-foreground">This version already has a demo review; sending the same review again returns the existing result. Only the latest version can be reviewed, and old versions are read-only.</p></> : <><Field label="Review comment"><Textarea value={review} onChange={(e) => { setReview(e.target.value); }} /></Field><div className="mt-2"><Btn variant="primary" disabled={!sel.ok || versionNumber !== sel.versions} onClick={() => { setReviewed(true); toast("Demo review recorded"); }}>Submit demo review</Btn></div></>}</Card>
+            <Card title="Demo review"><p className="text-[13px]">“{review}”</p><p className="text-[11px] text-muted-foreground">hq-operator · version {versionNumber} · 2026-09-14 10:05</p><p className="mt-1 text-xs text-muted-foreground">This version already has a demo review; sending the same review again returns the existing result. Only the latest version can be reviewed, and old versions are read-only.</p></Card>
           </div>
         </div>
       ) : (
