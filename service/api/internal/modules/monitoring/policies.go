@@ -1180,7 +1180,7 @@ func (m Policies) loadKinds(
 //	@Description	admin:alert.policy.read:kind=alert-or-default_alert | admin:automation.policy.read:kind=automation
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-A05, DD-A11, DD-A12, DD-C15
+//	@Description	Design: DD-A11
 //	@Tags			policies
 //	@Accept			json
 //	@Produce		json

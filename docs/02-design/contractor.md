@@ -25,16 +25,16 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 
 | Design ID / requirement | Route / main component | Read and action contracts | Input, processing, validation | Errors and prohibited actions |
 |---|---|---|---|---|
-| DD-P01 / FR-P01 | `/partner` (dashboard), `/partner/jobs` (list) / `PartnerOverview`, `PartnerJobList` | `jobs.list`, `jobs.get`, `summaries.get`, `members.capacity`, `members.list`, `units.list`, `jobs.events` | Get contractorOrgId from the session. KPI tiles link to the job list with the same filter. Show overdue jobs separately from unit urgency. The Offered, Active and Review tabs and their counts ask `jobs.list` with `currentOnly`, so a delegation that ended unfinished lists only under Completed/All and in History (IR797) | Show an empty state for zero jobs. Clear previous summaries when access expires |
+| DD-P01 / FR-P01 | `/partner` (dashboard), `/partner/jobs` (list) / `PartnerOverview`, `PartnerJobList` | `jobs.list`, `summaries.get`, `members.capacity`, `members.list`, `units.list`, `jobs.events` | Get contractorOrgId from the session. KPI tiles link to the job list with the same filter. Show overdue jobs separately from unit urgency. The Offered, Active and Review tabs and their counts ask `jobs.list` with `currentOnly`, so a delegation that ended unfinished lists only under Completed/All and in History (IR797) | Show an empty state for zero jobs. Clear previous summaries when access expires |
 | DD-P02 / FR-P02 | `/partner/jobs/:id` / `PartnerJob` | `jobs.get`, `jobs.accept`, `jobs.decline`, `jobs.proposePartnerSlot`, `jobs.withdrawPartnerSlot`, `members.list`, `members.capacity`, `jobs.events`, `units.get`, `alerts.get` | Accept only an offer addressed to the user's company within its valid period. Declining requires a reason (1–1000 characters, provisional) | Treat expiry, HQ cancellation, or another person's update as CONFLICT and refetch. Declining does not delete the job |
 | DD-P03 / FR-P03 | `/partner/schedule` / `AssignmentEditor` | `jobs.list`, `members.eligible`, `jobs.assign`, `jobs.get`, `members.list`, `members.capacity`, `units.list`, `units.get` | Choose an own qualified technician for the agreed visit time (fixed, IR113); while the work is under way an extension keeps the start and needs a reason (IR123 item 4). Assign only inside the delegation period | Reject saving if a confirmed schedule overlaps, and reschedule. Reassignment after work starts requires a reason and revokes previous access |
-| DD-P04 / FR-P04 | `/partner/units/:id` / `PartnerUnit` | `units.get`, `alerts.list`, `telemetry.summary` | Match the unit ID to a valid accepted job. Show only the necessary site address and entry instructions | Reject direct URLs after the delegation period ends. Provide no remote-control buttons |
+| DD-P04 / FR-P04 | `/partner/units/:id` / `PartnerUnit` | `units.get`, `alerts.list` | Match the unit ID to a valid accepted job. Show only the necessary site address and entry instructions | Reject direct URLs after the delegation period ends. Provide no remote-control buttons |
 | DD-P05 / FR-P05 | `/partner/jobs/:id/review` / `QualityReview` | `jobs.get`, `jobs.review`, `reports.get`, `attachments.getContent`, `members.list`, `alerts.get`, `units.get` | Review only submitted reports. Select “Accept” or “Return”; a return requires a reason. Keep earlier report revisions | Do not overwrite the technician's original report or allow people to approve their own work |
 | DD-P06 / FR-P06 | `/partner/team` / `TeamCapacity` | `members.list`, `jobs.list`, `members.capacity`, `members.setUnavailability`, `members.unavailability`, `members.clearUnavailability`, `partnerUsers.list` | Filter by date or qualification within the user's company. Qualifications are fictional demo attributes | Do not assign candidates with expired memberships. New users and access ends are managed in Users (FR-P11); qualifications are granted by HQ from certificates (IR579) |
 | DD-P07 / FR-P07 | `/partner/history` / `PartnerHistory` | `jobs.events`, `jobs.addNote`, `notifications.preview`, `notifications.recipients`, `jobs.list`, `members.list`, `units.list` | Select jobId and a template. Notes are 1–2000 characters (provisional); select only authorized recipients | Do not allow free-entry external recipients or include confidential customer billing data in templates |
 | DD-P08 / FR-P08 | `/partner/*` / `PartnerAccessGuard` | `jobs.get`, `session.get` | Recheck accepted delegation and its period immediately before every action. Use the demo clock for expiry | Once expired, reject the next action and discard cached data even if the screen remains open |
 | DD-P09 / FR-P09 | `/partner/team?tab=certifications` / `CertificateList` | `certificates.list`, `certificates.getContent`, `certificates.submit`, `certificates.requestTraining` | Renewal file PDF/JPG/PNG ≤ 10 MB; issuedAt < expiresAt; eligibility uses verified certificates | Pending renewals do not extend eligibility; other companies NOT_FOUND |
-| DD-P10 / FR-P10 | `/partner/payouts` / `PartnerPayouts` | `payouts.list`, `payouts.get`, `payouts.query`, `rateCards.list`, `jobs.get`, `units.get`, `jobs.list` | Approved/paid statements only; question message 1–2000 | Corrections only as next-statement adjustments |
+| DD-P10 / FR-P10 | `/partner/payouts` / `PartnerPayouts` | `payouts.list`, `payouts.query`, `rateCards.list`, `jobs.get`, `units.get`, `jobs.list` | Approved/paid statements only; question message 1–2000 | Corrections only as next-statement adjustments |
 | DD-P11 / FR-P11 | `/partner/users` / `PartnerUsers` | `partnerUsers.list`, `partnerUsers.save`, `partnerUsers.remove`, `partnerUsers.resendInvite` | Own company only; e-mail unique per company (case-insensitive); the account is created when added and its e-mail and role are fixed (IR461); a technician's access end at most a year ahead; never the own account; the company keeps an active contractor | Permissions and qualifications stay with HQ (DD-A03) |
 
 ## Shared Implementation Steps
@@ -58,7 +58,7 @@ Keep form values in the form component and validate them with its pure validator
 
 **Source mapping**: SRC-06 BIZ-04, BIZ-12 → FR-P01 → DD-P01. Source category: development policy SRC-02 + design additions. Design additions defined here: dashboard for delegated jobs. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-P01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `jobs.list, jobs.get, summaries.get, members.capacity, members.list, units.list, jobs.events`.
+Scope: FR-P01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `jobs.list, summaries.get, members.capacity, members.list, units.list, jobs.events`.
 
 **Initial view and prerequisites**: An active contractor Membership is required. HQ offer summaries can be viewed before acceptance. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -156,7 +156,7 @@ Scope: FR-P03 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 **Source mapping**: SRC-06 BIZ-12 → FR-P04 → DD-P04. Source category: development policy SRC-02 + design additions. Design additions defined here: limited access to target units and alert evidence. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-P04 / Main display pattern: **UI-DETAIL**. Service boundary: `units.get, alerts.list, telemetry.summary`.
+Scope: FR-P04 / Main display pattern: **UI-DETAIL**. Service boundary: `units.get, alerts.list`.
 
 **Initial view and prerequisites**: The unit belongs to an accepted, active delegation. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -344,7 +344,7 @@ Scope: FR-P09 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 **Source mapping**: SRC-06 BIZ-12, BIZ-21 → FR-P10 → DD-P10. Source category: Figma-confirmed screen specification (Contractor 06-1/06-2, 2026-10-01).
 
-Scope: FR-P10 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary: `payouts.list, payouts.get, payouts.query, rateCards.list, jobs.get, units.get, jobs.list`.
+Scope: FR-P10 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary: `payouts.list, payouts.query, rateCards.list, jobs.get, units.get, jobs.list`.
 
 **Initial view and prerequisites**: Contractor Membership; route `/partner/payouts?statementId=` (latest approved statement by default).
 

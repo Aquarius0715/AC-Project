@@ -170,7 +170,7 @@ func (in *StartInput) Validate() map[string]string {
 //	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; \
 //	@Description	IR94 technician write table (assignment and work window, jobId required when typed)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-//	@Description	Design: DD-T08, DD-T13
+//	@Description	Design: DD-T13
 //	@Tags			jobs
 //	@Accept			json
 //	@Produce		json

@@ -542,7 +542,7 @@ func (m Alerts) where(
 //	@Description	admin:alert.read | admin:alert.policy.read
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-T07, DD-A05, DD-T12, DD-P05, DD-P02
+//	@Description	Design: DD-T12, DD-P05, DD-P02
 //	@Tags			alerts
 //	@Accept			json
 //	@Produce		json

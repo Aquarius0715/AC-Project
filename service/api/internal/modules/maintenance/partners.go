@@ -1067,8 +1067,8 @@ func (Partners) saveRateCard(
 //	@Description	Authorization: admin:job.read | admin:billing.read | contractor:own-company
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-A21, DD-A23, DD-P10 · Query: filters contractorOrgId · sort id,createdAt,effectiveFrom \
-//	@Description	(default effectiveFrom desc;id asc)
+//	@Description	Design: DD-A21, DD-P10 · Query: filters contractorOrgId · sort id,createdAt,effectiveFrom (default \
+//	@Description	effectiveFrom desc;id asc)
 //	@Tags			rateCards
 //	@Accept			json
 //	@Produce		json
