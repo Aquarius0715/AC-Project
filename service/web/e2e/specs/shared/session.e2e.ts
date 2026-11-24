@@ -3,7 +3,9 @@
 // sign-in that came back says why.
 import type { Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
-import { enterPassword, signIn } from "../../fixtures/auth";
+import { emailOf, enterPassword, signIn } from "../../fixtures/auth";
+import { APPS } from "../../fixtures/apps";
+import { must } from "../../fixtures/must";
 
 // the page's own alerts, not Next.js's route announcer (role alert too)
 const notice = (page: Page) => page.locator('[role="alert"]:not(#__next-route-announcer__)');
@@ -80,6 +82,23 @@ test.describe("signed out", () => {
     await expect(notice(page)).toContainText("Your session ended");
     await page.goto("/login"); // a plain visit goes straight on to the identity provider (IR790)
     await expect(page.locator("#password")).toBeVisible();
+  });
+
+  // IR876: the four apps share one single sign-on session; when it holds another app's account, the app asks for the
+  // password at once (no role error), with the account last signed in to this app already entered
+  test("a sign-in that finds another app's account asks for this app's password", async ({ context, app }) => {
+    const other = must(APPS.find((a) => a.id === (app.id === "partner" ? "customer" : "partner")));
+    await signIn(await context.newPage(), app); // this app remembers its account
+    const cookies = await context.cookies();
+    const hint = cookies.filter((c) => c.name.includes("ac_login_hint_"));
+    await context.clearCookies(); // this app's session ended and the single sign-on with it
+    await context.addCookies(hint);
+    await signIn(await context.newPage(), other); // the single sign-on now holds the other app's account
+    const page = await context.newPage(); // a page of its own: the apps' pages above may still be moving on
+    await page.goto(`${app.url}${app.home}`);
+    await expect(page.locator("#password")).toBeVisible();
+    await expect(page.locator("#username")).toHaveValue(emailOf(app.user));
+    await expect(page).not.toHaveURL(/error=role/);
   });
 
   test("a protected page keeps where it was going", async ({ page, app }) => {

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { APP_ROLE, cookieOptions, createSessionCookie, OIDC_COOKIE, oidcConfigFor, oidcCookieOptions, roleHome, SESSION_COOKIE, sessionFromTokens, tokenResponse, unsealAs, type Session, type TokenResponse } from "@ac/web/lib/session";
+import { APP_ROLE, cookieOptions, createSessionCookie, endIdpSession, LOGIN_HINT_COOKIE, loginHintCookieOptions, loginHintFor, OIDC_COOKIE, oidcConfigFor, oidcCookieOptions, roleHome, SESSION_COOKIE, sessionFromTokens, tokenResponse, unsealAs, type Session, type TokenResponse } from "@ac/web/lib/session";
 import { z } from "zod";
 import { orNull } from "@ac/web/lib/promises";
 
@@ -48,6 +48,16 @@ async function exchange(config: ReturnType<typeof oidcConfigFor>, verifier: stri
   }
 }
 
+/** Starts the sign-in again with the identity provider's password form (prompt=login), back to `returnTo`. */
+function askPassword(appUrl: string, returnTo: string | null): NextResponse {
+  const again = new URL("/bff/auth/login", appUrl);
+  again.searchParams.set("reauth", "1");
+  if (returnTo) again.searchParams.set("returnTo", returnTo);
+  const res = NextResponse.redirect(again);
+  res.cookies.set(OIDC_COOKIE, "", oidcCookieOptions(0));
+  return res;
+}
+
 // GET /bff/auth/callback: exchanges the code, reads tenant / membership / role claims and starts the session: a new
 // stored record and its sealed ID in the cookie (IR382), or the sealed session itself without the store.
 export async function GET(req: NextRequest) {
@@ -61,16 +71,18 @@ export async function GET(req: NextRequest) {
   if (!tokens) return NextResponse.redirect(new URL("/login?error=token", config.appUrl));
   const session = sessionFromTokens(tokens);
   if (!session) return NextResponse.redirect(new URL("/login?error=membership", config.appUrl));
-  if (session.role !== APP_ROLE) return NextResponse.redirect(new URL("/login?error=role", config.appUrl)); // another role's app
+  // another role's account: the four apps share one single sign-on session, so it is the account last signed in to
+  // another app (IR876). That session is ended (as the provider's own "change account" does), so the password form
+  // asks for an e-mail address again, filled in with this app's last account; another role's account typed there is
+  // the sign-in page's role error.
+  if (session.role !== APP_ROLE) {
+    if (pending.reauth) return NextResponse.redirect(new URL("/login?error=role", config.appUrl));
+    if (session.refreshToken) await endIdpSession(session.refreshToken); // not ended: the form keeps that account, with its "change account"
+    return askPassword(config.appUrl, pending.returnTo);
+  }
   // signed out everywhere after this sign-in (IR384): ask for the password once (prompt=login), then give up (IR385)
   if (await revokedSignIn(session)) {
-    if (pending.reauth) return NextResponse.redirect(new URL("/login?error=revoked", config.appUrl));
-    const again = new URL("/bff/auth/login", config.appUrl);
-    again.searchParams.set("reauth", "1");
-    if (pending.returnTo) again.searchParams.set("returnTo", pending.returnTo);
-    const res = NextResponse.redirect(again);
-    res.cookies.set(OIDC_COOKIE, "", oidcCookieOptions(0));
-    return res;
+    return pending.reauth ? NextResponse.redirect(new URL("/login?error=revoked", config.appUrl)) : askPassword(config.appUrl, pending.returnTo);
   }
   let cookie: string;
   try {
@@ -81,5 +93,7 @@ export async function GET(req: NextRequest) {
   const res = NextResponse.redirect(new URL(pending.returnTo ?? roleHome[session.role], config.appUrl));
   res.cookies.set(SESSION_COOKIE, cookie, cookieOptions());
   res.cookies.set(OIDC_COOKIE, "", oidcCookieOptions(0));
+  const hint = loginHintFor(session.accessToken); // this app's account, for the next password form (IR876)
+  if (hint !== null) res.cookies.set(LOGIN_HINT_COOKIE, hint, loginHintCookieOptions());
   return res;
 }
