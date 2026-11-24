@@ -21,8 +21,9 @@
 # (-- migrate:breaking), and at the first deployment with the file.
 #
 #   deploy.sh deploy TAG   deploys the tag (the workflow; by hand, from a checkout that has the tag)
-#   deploy.sh boot         after a reboot: the stack again, then the API services once Keycloak answers, as they load
-#                          its token keys at start (IR419); the unit ac-test-boot runs it
+#   deploy.sh boot         after a reboot: the realm and the broker logins again, the stack, then the API services
+#                          once Keycloak answers, as they load its token keys at start (IR419); the unit ac-test-boot
+#                          runs it
 #   deploy.sh status       the deployed tag, the last failures and the containers
 #   deploy.sh reset        the data again from the seed, on the deployed tag
 #
@@ -48,6 +49,10 @@ MULTIHOST=deploy/test/compose.multihost.yaml # more than one address (IR651); a 
 STRIPE=stripe                      # the profile of the Stripe CLI, which forwards test-mode webhooks to the gateway
 ROLLING_FILE=deploy/test/compose.rolling.yaml # replacing one container at a time (IR855); a tag before it has none
 EDGE=$ROOT/web-edge                # web-edge's nginx configuration, outside the checkout (its path changes with the runner)
+# the stack's broker logins (docker/mosquitto/passwd.sh), outside the checkout: the tree is a runner's workspace, and a
+# CI job checking it out again put the committed file back, which the broker read at its next start and then refused
+# the bridge (2026-11-24)
+BROKER_LOGINS=$ROOT/mosquitto
 # replaced one container at a time, in this order: the domain services before the gateway that calls them, the gateway
 # before the apps; the apps are behind web-edge
 ROLLING=(identity-api equipment-api maintenance-api billing-api energy-api gateway
@@ -96,7 +101,8 @@ stripe_settings() {
 # nginx that checks it, and the APIs accept the tokens of a sign-in on any of those addresses.
 compose() {
   local tag=$1 files=(-f "$REPO/compose.yaml" -f "$REPO/deploy/test/compose.test.yaml")
-  local env=(IMAGE_TAG="$tag" DEMO_CLOCK_START=now WEB_EDGE_DIR="$EDGE") profiles=(--profile full --profile iot)
+  local env=(IMAGE_TAG="$tag" DEMO_CLOCK_START=now WEB_EDGE_DIR="$EDGE" MOSQUITTO_PASSWD_DIR="$BROKER_LOGINS")
+  local profiles=(--profile full --profile iot)
   shift
   if stripe_on; then
     profiles+=(--profile "$STRIPE")
@@ -186,16 +192,34 @@ for name, service in sorted(json.load(sys.stdin)["services"].items()):
   done
 }
 
-# the realm with this environment's URLs and client secrets, and the stack's own broker logins
+# the realm with this environment's URLs and client secrets, and the stack's own broker logins in BROKER_LOGINS (a tag
+# before it writes them into the tree, where its compose.yaml mounts them from). LOGINS_CHANGED is 1 when the logins
+# were written again: the running broker read the file before (broker_logins).
+LOGINS_CHANGED=0
 prepare() {
-  local keys result=0
+  local keys result=0 before
   python3 "$REPO/deploy/test/realm.py" "$REPO/docker/keycloak/realm-ac.json" "$ROOT/realm-ac.json" "$SETTINGS" ||
     return 1
+  before=$(cat "$BROKER_LOGINS/passwd" 2>/dev/null || true)
   keys=$(mktemp) || return 1
   grep -E '^MQTT_(DEVICE_SIM|IOT_BRIDGE)_KEY=' "$SETTINGS" >"$keys" &&
-    ENV_FILE=$keys sh "$REPO/docker/mosquitto/passwd.sh" >/dev/null || result=1
+    ENV_FILE=$keys MOSQUITTO_PASSWD_DIR=$BROKER_LOGINS sh "$REPO/docker/mosquitto/passwd.sh" >/dev/null || result=1
   rm -f "$keys"
+  if [ "$(cat "$BROKER_LOGINS/passwd" 2>/dev/null || true)" != "$before" ]; then
+    LOGINS_CHANGED=1
+  fi
   return "$result"
+}
+
+# the broker restarts when prepare wrote its logins again: it reads them only at its start, and Docker started it at
+# the boot before this script, or a deployment found it running; the bridge and the simulated modules connect again
+broker_logins() {
+  local tag=$1
+  [ "$LOGINS_CHANGED" = 1 ] || return 0
+  [ -n "$(containers mosquitto)" ] || return 0
+  log "the broker logins changed: restarting the broker"
+  compose "$tag" restart mosquitto || return 1
+  LOGINS_CHANGED=0
 }
 
 # removes the containers of the services this environment leaves out (the mock fleet's, and the Stripe CLI when Stripe
@@ -229,6 +253,7 @@ deploy() {
     compose "$tag" down --volumes --remove-orphans || return 1
   fi
   start "$tag" "$rolling" || return 1
+  broker_logins "$tag" || return 1
   step "waiting for the apps and Keycloak"
   ready 900 || return 1
   end_step
@@ -457,13 +482,15 @@ release() {
     [ -f "$REPO/$ROLLING_FILE" ] && git -C "$REPO" rev-parse --quiet --verify "refs/tags/$previous:$ROLLING_FILE" \
       >/dev/null && back=1
     log "back to $previous"
-    { checkout "$previous" && prepare && start "$previous" "$back"; } || log "$previous did not start again"
+    { checkout "$previous" && prepare && start "$previous" "$back" && broker_logins "$previous"; } ||
+      log "$previous did not start again"
     end_step
   fi
   return 1
 }
 
-# after a reboot: the stack again, then the API services once Keycloak answers
+# after a reboot: the realm and the broker logins from the environment file (the tree may have been checked out again
+# since the deployment), the stack again, then the API services once Keycloak answers
 boot() {
   local deployed
   deployed=$(state deployed)
@@ -472,8 +499,10 @@ boot() {
   fi
   log "after the boot: starting $deployed"
   checkout "$deployed" || return 1
+  prepare || return 1
   edge_files "$deployed" || return 1
   compose "$deployed" up -d --remove-orphans || return 1
+  broker_logins "$deployed" || return 1
   ready 900 || return 1
   compose "$deployed" restart "${API_SERVICES[@]}" || return 1
 }
