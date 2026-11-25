@@ -11137,3 +11137,11 @@ Found while writing the exception-screen tests (coverage loop round 6, PR #681).
 2. **Search.** No other screen of the four apps shows a permission code as text (the demos aside).
 3. **Tests.** `admin/tests/exceptionPermissions.test.tsx` checks the labels, that no code is shown, and "read only".
 
+
+## IR880 Propose another time refuses the client's own times, compared as instants — 2026-11-25
+
+Found while writing the Jobs tab tests (coverage loop round 23, PR #700). An HQ proposal must be a time the client did not already offer; one of their own times is booked directly. The Propose another time dialog checked this, but it compared the times as text. The form writes an instant as `2026-09-22T02:00:00.000Z`; the Core API sends `2026-09-22T02:00:00Z` (Go `time.Time`). The two never matched, so the warning "This is one of the client’s own times — book it directly instead." never appeared, and Send proposal was not stopped.
+
+1. **Screen.** The dialog compares the start and end as instants (`Date.parse`), however each side writes them. One of the client's preferred times shows the warning, and Send proposal sends nothing.
+2. **Search.** No other screen of the four apps compares slot times as text.
+3. **Tests.** `admin/tests/jobsPropose.test.tsx` proposes the 1st preferred time, as the API writes it: the warning shows and nothing is sent. A time an hour shorter has no warning. The test fails on the old comparison.
