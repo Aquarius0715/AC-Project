@@ -374,7 +374,8 @@ function ProposeModal({ d, live, onClose, onFail }: Readonly<ModalProps>) {
   const [reply, setReply] = useState("48");
   const [tried, setTried] = useState(false);
   const slot = { startAt: zonedInstant(date, from, zone), endAt: zonedInstant(date, to, zone) }; // typed in the display time zone (NFR-08)
-  const isPreferred = j.preferredSlots.some((s) => s.startAt === slot.startAt && s.endAt === slot.endAt);
+  // the same instants, however each side writes them: the API sends "…:00Z", the form "…:00.000Z"
+  const isPreferred = j.preferredSlots.some((s) => Date.parse(s.startAt) === Date.parse(slot.startAt) && Date.parse(s.endAt) === Date.parse(slot.endAt));
   const send = () => {
     setTried(true);
     if (!notice.trim() || isPreferred || !isBefore(from, to) || !who) return;
