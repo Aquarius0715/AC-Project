@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { restrictionRows, type ApiRestriction, type PerUnit, type RestrictionState, type UnitRow } from "@ac/web/lib/restrictions";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
@@ -59,7 +59,8 @@ function liveOf(r: ApiRestriction | null, over: Partial<Live> = {}, selected: Pa
   };
 }
 const button = (name: string | RegExp) => screen.getByRole("button", { name });
-const flush = () => new Promise((r) => { setTimeout(r, 0); });
+// inside act, so the state updates the settled action makes (a closed dialog, a toast) render before the checks
+const flush = () => act(() => new Promise<void>((r) => { setTimeout(r, 0); }));
 
 beforeEach(() => {
   nav.patch.mockReset(); nav.toasts = [];

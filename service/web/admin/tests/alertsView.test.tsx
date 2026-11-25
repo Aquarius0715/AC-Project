@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ComponentProps, ReactNode } from "react";
 import { adminAlertRows, policyRows, type AdminPolicy, type ApiAdminAlert } from "@ac/web/lib/adminAlerts";
 import type { ApiEvidenceCandidate } from "@ac/web/lib/alertEvidence";
@@ -63,7 +63,8 @@ function liveOf(alerts: ApiAdminAlert[], over: Partial<Live> = {}, q: Partial<Li
 }
 const candidate = (id: string): ApiEvidenceCandidate => ({ id, kind: "remeasurement", observedAt: "2026-09-14T01:20:00Z", metric: "temperature", value: 26.4, unit: "°C", origin: "measured", quality: "valid", eventType: null });
 const button = (name: string | RegExp) => screen.getByRole<HTMLButtonElement>("button", { name });
-const flush = () => new Promise((r) => { setTimeout(r, 0); });
+// inside act, so the state updates the settled action makes (a closed dialog, a toast) render before the checks
+const flush = () => act(() => new Promise<void>((r) => { setTimeout(r, 0); }));
 
 beforeEach(() => {
   nav.patch.mockReset(); nav.replace.mockReset(); nav.toasts = [];
@@ -117,8 +118,8 @@ describe("the HQ alerts tab in API mode", () => {
     expect(actions.acknowledgeAlert).toHaveBeenCalledWith("al-1", 2);
     expect(nav.toasts).toStrictEqual(["Acknowledged"]);
     fireEvent.click(button("Acknowledge"));
-    await flush();
-    expect(nav.toasts).toHaveLength(2); // the refusal's message
+    // the refusal's message: it takes more than one macrotask on a loaded CI runner (PR #684's run failed here)
+    await waitFor(() => { expect(nav.toasts).toHaveLength(2); });
     expect(nav.toasts[1]).not.toBe("Acknowledged");
   });
 
