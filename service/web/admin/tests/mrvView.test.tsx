@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { mrvView, reportRows, reviewItems, type ApiEvidencePage, type ApiFactor, type ApiMRVReport } from "@ac/web/lib/mrv";
 import { baselineRows, type ApiEnergySummary } from "@ac/web/lib/energy";
@@ -78,7 +78,8 @@ function liveOf(shown: ApiMRVReport | null, over: Partial<Live> = {}, latest = s
   };
 }
 const button = (name: string | RegExp) => screen.getByRole("button", { name });
-const flush = () => new Promise((r) => { setTimeout(r, 0); });
+// inside act, so the state updates the settled action makes (a closed dialog, a toast) render before the checks
+const flush = () => act(() => new Promise<void>((r) => { setTimeout(r, 0); }));
 
 beforeEach(() => {
   nav.patch.mockReset(); nav.toasts = [];
