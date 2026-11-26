@@ -1,0 +1,64 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "NSCameraUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The camera scans the QR label on the AC when you check in at the site."
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kamera mengimbas label QR pada AC semasa anda daftar masuk di tapak."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現場でチェックインするとき、カメラでエアコンの QR ラベルを読み取ります。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kamera memindai label QR pada AC saat Anda check-in di lokasi."
+          }
+        }
+      }
+    },
+    "NSLocationWhenInUseUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you check in, your position is compared with the site's map pin (within 200 m); it is not kept."
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Semasa anda daftar masuk, kedudukan anda dibandingkan dengan pin peta tapak (dalam 200 m); ia tidak disimpan."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "チェックインのとき、現在地を現場の地図ピン（200 m 以内）と照らし合わせます。位置は保存されません。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saat Anda check-in, posisi Anda dibandingkan dengan pin peta lokasi (dalam 200 m); posisi tidak disimpan."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

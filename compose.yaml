@@ -56,7 +56,7 @@ x-backend: &backend          # Core API business-domain services (service/api/cm
     OIDC_ISSUER: ${API_OIDC_ISSUER:-${KEYCLOAK_URL:-http://localhost:8081}/realms/ac}   # must equal the iss claim of the tokens the BFF gets (the browser's address, or keycloak:8080 when the provider has several, IR651)
     OIDC_JWKS_URL: http://keycloak:8080/realms/ac/protocol/openid-connect/certs
     OIDC_ADMIN_CLIENT_ID: ac-admin-web
-    OIDC_APP_CLIENT_ID: ac-customer-web,ac-partner-web,ac-technician-web   # one client per app (IR790), comma separated
+    OIDC_APP_CLIENT_ID: ac-customer-web,ac-partner-web,ac-technician-web,ac-customer-ios,ac-technician-ios   # one client per app (IR790; the iOS apps DEC-112), comma separated
     APP_URL_CUSTOMER: ${CUSTOMER_WEB_URL:-http://localhost:3000}
     APP_URL_PARTNER: ${PARTNER_WEB_URL:-http://localhost:3001}
     APP_URL_TECHNICIAN: ${TECHNICIAN_WEB_URL:-http://localhost:3002}

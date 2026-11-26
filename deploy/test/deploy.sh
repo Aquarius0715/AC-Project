@@ -58,6 +58,8 @@ BROKER_LOGINS=$ROOT/mosquitto
 ROLLING=(identity-api equipment-api maintenance-api billing-api energy-api gateway
   customer-web-api partner-web-api technician-web-api admin-web-api portal-web)
 WEB_APPS=(customer-web-api partner-web-api technician-web-api admin-web-api portal-web)
+# the services web-edge sends requests to: the apps, and the gateway for the iOS apps (/v1/ only, DEC-112)
+EDGE_SERVICES=("${WEB_APPS[@]}" gateway)
 BREAKING_MARKER='-- migrate:breaking' # a migration the code before it cannot run on (internal/migrate, IR855)
 
 log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
@@ -290,8 +292,8 @@ containers() {
     --filter "label=com.docker.compose.service=$1"
 }
 
-# whether the service $1 is one of the apps behind web-edge
-is_app() { grep -qxF -e "$1" <<<"$(printf '%s\n' "${WEB_APPS[@]}")"; }
+# whether the service $1 is behind web-edge (an app, or the gateway)
+is_app() { grep -qxF -e "$1" <<<"$(printf '%s\n' "${EDGE_SERVICES[@]}")"; }
 
 # web-edge's configuration for the tag $1: its nginx file, and the upstreams by service name. A tag without
 # compose.rolling.yaml has no web-edge.
@@ -306,13 +308,15 @@ edge_files() {
 # container IDs $2, the app $1 by those containers alone (the old ones while the new one starts, then the new one while
 # the old ones stop), so no request reaches a container that is not ready or about to stop
 upstreams() {
-  local app id servers
-  for app in "${WEB_APPS[@]}"; do
-    servers="server $app:3000 resolve; "
+  local app id servers port
+  for app in "${EDGE_SERVICES[@]}"; do
+    port=3000
+    [ "$app" = gateway ] && port=8080
+    servers="server $app:$port resolve; "
     if [ "$app" = "${1:-}" ]; then
       servers=
       for id in $2; do
-        servers+="server $(docker inspect -f '{{.Name}}' "$id" | sed 's#^/##'):3000 resolve; "
+        servers+="server $(docker inspect -f '{{.Name}}' "$id" | sed 's#^/##'):$port resolve; "
       done
     fi
     printf 'upstream %s-pool { zone %s-pool 64k; %s}\n' "$app" "$app" "$servers"

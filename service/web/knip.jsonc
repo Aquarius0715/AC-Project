@@ -6,8 +6,9 @@
       // the E2E project has no package.json of its own: its config, set-up and specs are the entries; the lint configs are read
       // by ESLint, not imported
       // the load scenarios (k6 runs them: load/scenarios/*.ts) are entries as well; their lint config is read by ESLint
-      "entry": ["e2e/setup/*.ts", "e2e/specs/**/*.e2e.ts", "eslint.base.mjs", "load/scenarios/*.ts"],
-      "project": ["e2e/**/*.ts", "load/**/*.ts"],
+      // the Swift generators of the iOS apps (codegen/*.ts, npm run gen:swift) are entries too (DEC-112)
+      "entry": ["e2e/setup/*.ts", "e2e/specs/**/*.e2e.ts", "eslint.base.mjs", "load/scenarios/*.ts", "codegen/*.ts"],
+      "project": ["e2e/**/*.ts", "load/**/*.ts", "codegen/**/*.ts"],
       // used through the root node_modules by what knip does not read: tailwindcss and shadcn by the apps' CSS and components.json,
       // globals by the ESLint configs, and k6 (k6, k6/http, k6/data, ...) by the k6 runtime that runs the load scenarios
       "ignoreDependencies": ["tailwindcss", "shadcn", "globals", "k6"]

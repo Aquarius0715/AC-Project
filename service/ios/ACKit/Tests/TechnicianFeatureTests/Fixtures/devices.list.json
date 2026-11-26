@@ -1,0 +1,64 @@
+{
+    "data": {
+        "items": [
+            {
+                "id": "88ee2ed2-79db-53b6-be15-a92f7829c53d",
+                "tenantId": "820cc6b6-9ea8-5d18-8b10-5c8c1d126814",
+                "version": 1,
+                "createdAt": "2026-09-01T00:00:00Z",
+                "updatedAt": "2026-09-01T00:00:00Z",
+                "bindingId": "7e027285-1093-52ec-9266-947c3a3e66af",
+                "unitId": "e841ee95-3171-54d5-be91-1f2301bdb701",
+                "targetUnitId": "e841ee95-3171-54d5-be91-1f2301bdb701",
+                "createdByMembershipId": "8753dc61-977a-5ac6-afb4-ac7c5673ae17",
+                "serial": "AC-DEMO-0002",
+                "mqttNode": null,
+                "connection": "online",
+                "lastSeenAt": "2026-09-27T04:57:14.80463Z",
+                "firmwareVersion": "v1",
+                "powerSignal": "on",
+                "tamper": "clear",
+                "iotModelId": "4f0fce53-656a-5856-a603-d70bb496bca0",
+                "iotModelVersion": 1,
+                "sensors": [
+                    {
+                        "boundaryId": null,
+                        "id": "9f67089f-44c9-5231-ba20-03d3b9a1be53",
+                        "deviceId": "88ee2ed2-79db-53b6-be15-a92f7829c53d",
+                        "metric": "humidity",
+                        "unit": "%",
+                        "staleAfterSeconds": 120,
+                        "calibratedAt": null
+                    },
+                    {
+                        "boundaryId": "ac_input_electricity",
+                        "id": "9aa7d20f-f28a-53c7-9553-14097801e928",
+                        "deviceId": "88ee2ed2-79db-53b6-be15-a92f7829c53d",
+                        "metric": "power",
+                        "unit": "kW",
+                        "staleAfterSeconds": 120,
+                        "calibratedAt": null
+                    },
+                    {
+                        "boundaryId": null,
+                        "id": "d8e49948-6f47-5bf0-988f-7b37feb6d5c9",
+                        "deviceId": "88ee2ed2-79db-53b6-be15-a92f7829c53d",
+                        "metric": "temperature",
+                        "unit": "°C",
+                        "staleAfterSeconds": 120,
+                        "calibratedAt": null
+                    }
+                ]
+            }
+        ],
+        "nextCursor": null,
+        "total": 1,
+        "snapshotVersion": 1
+    },
+    "meta": {
+        "correlationId": "01a1fa42-dcaa-792f-866b-c755ce58eae0",
+        "eventCursor": 110152,
+        "operation": "devices.list",
+        "snapshotAt": "2026-09-27T04:57:32.573682889Z"
+    }
+}

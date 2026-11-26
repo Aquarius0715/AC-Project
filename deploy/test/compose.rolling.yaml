@@ -49,9 +49,10 @@ services:
       - "${PUBLISH_ADDR:-127.0.0.1}:${TECHNICIAN_WEB_PORT:-3002}:3002"
       - "${PUBLISH_ADDR:-127.0.0.1}:${ADMIN_WEB_PORT:-3003}:3003"
       - "${PUBLISH_ADDR:-127.0.0.1}:${PORTAL_WEB_PORT:-3204}:3004"
+      - "${PUBLISH_ADDR:-127.0.0.1}:${CORE_API_PORT:-3205}:3205"   # the Core API for the iOS apps, /v1/ only (DEC-112)
     # outside the checkout, whose path changes with the runner that deploys (a changed path would recreate web-edge)
     volumes: ["${WEB_EDGE_DIR:?deploy.sh names the directory of edge.conf and 00-upstreams.conf}:/etc/nginx/conf.d:ro"]
     # the first deployment with this file: the apps give up their ports before web-edge takes them
-    depends_on: [customer-web-api, partner-web-api, technician-web-api, admin-web-api, portal-web]
+    depends_on: [customer-web-api, partner-web-api, technician-web-api, admin-web-api, portal-web, gateway]
     networks: [edge]
     profiles: [full]

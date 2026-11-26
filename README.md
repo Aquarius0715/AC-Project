@@ -7,6 +7,7 @@ app on a Go Core API split into business-domain services. The specification live
 |---|---|
 | `service/api` | Go (Echo): gateway, five domain services (identity, equipment, maintenance, billing, energy), workers, migrations, IoT bridge and device simulator |
 | `service/web` | Next.js: `customer`, `partner`, `technician`, `admin` apps, the `portal` (every service address, IR791) and the shared package; Playwright E2E in `e2e/`, k6 load scenarios in `load/` |
+| `service/ios` | SwiftUI: the AC Customer and AC Technician iOS apps (DEC-112) and their `ACKit` package; `project.yml` for XcodeGen |
 | `service/device` | the ESP32 firmware of the real sensor nodes ([device firmware requirements](docs/02-design/device-firmware.md)) |
 | `docs` | requirements, design, catalogs, validators (`docs/tools`) |
 | `docker` | Keycloak realm and themes, Mosquitto, LocalStack, WireMock, the OpenTelemetry collector, IoT demo script |
@@ -72,8 +73,17 @@ docker compose --env-file .env.local --profile full run --rm migrate \
 sh scripts/check.sh                       # before a push: web lint/typecheck/Vitest, gofmt/vet/golangci-lint, generated files, docs validators
 (cd service/api && make test-all)         # Go unit + integration suites on fresh test databases (both service layouts)
 (cd service/web && npm run e2e)           # Playwright against the running stack
+sh service/ios/scripts/check.sh           # iOS: SwiftLint, swift-format, unit tests at 100 %, both apps' UI tests (needs Xcode)
+TEST_RUNNER_AC_UI_LIVE=1 xcodebuild -project service/ios/AC.xcodeproj -scheme CustomerApp test \
+  -destination 'platform=iOS Simulator,name=iPhone 15'   # an app's UI tests with its live sign-in to the running stack
+# the live geofence report also needs a pin on a customer-a property, and the simulator at it with the permission:
+#   xcrun simctl privacy "iPhone 15" grant location-always com.pradita.ac.customer
+#   xcrun simctl location "iPhone 15" set <latitude>,<longitude>; then TEST_RUNNER_AC_UI_LIVE_PRESENCE=1 as well
+# the live job check needs a job assigned to tech-internal-a before its answer, its window around the stack's time:
+#   TEST_RUNNER_AC_UI_LIVE_JOB=<job id> (the TechnicianApp scheme); it accepts, checks in manually, pauses and resumes;
+#   TEST_RUNNER_AC_UI_LIVE_REPORT=<job id> on such a job fills its report, saves, signs and submits it
 ```
 
-GitHub Actions run the same: `.github/workflows/ci.yml` (nine parallel jobs, 15 checks) on every push to `main` and on
+GitHub Actions run the same: `.github/workflows/ci.yml` (11 parallel jobs, 21 checks, the iOS ones on a macOS runner) on every push to `main` and on
 pull requests, and `.github/workflows/e2e.yml` (the compose stack + Playwright) every night on `main` and by hand. Actions are pinned by commit SHA, images by
 digest and Go/npm dependencies by lock file; `.github/dependabot.yml` proposes their updates as weekly pull requests.

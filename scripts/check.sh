@@ -52,7 +52,11 @@ done
 job "web shared" "$web && npm run lint --workspace=shared && npm run typecheck --workspace=shared"
 job "web vitest" "$web && npm test"   # as CI: each workspace with its own vitest.config (shared: jsdom, 30 s per test)
 job "web e2e, load, knip" "$web && npx eslint --max-warnings=0 -c e2e/eslint.config.mjs e2e && npx eslint --max-warnings=0 -c load/eslint.config.mjs load \
-  && npx tsc -p e2e/tsconfig.json && npx tsc -p load/tsconfig.json && npm run knip"
+  && npx eslint --max-warnings=0 -c codegen/eslint.config.mjs codegen \
+  && npx tsc -p e2e/tsconfig.json && npx tsc -p load/tsconfig.json && npx tsc -p codegen/tsconfig.json && npm run knip \
+  && npm run gen:swift -- --check"
+# the iOS apps (DEC-112) need Xcode: a machine without it says so instead of passing them silently
+job "ios" "if xcodebuild -version >/dev/null 2>&1; then sh service/ios/scripts/check.sh; else echo 'skipped: no Xcode on this machine (CI job ios runs them)'; fi"
 job "go" "cd service/api && { test -z \"\$(gofmt -l .)\" || { gofmt -l .; exit 1; }; } && GOTOOLCHAIN=auto go vet ./... && make lint"
 # one command per line: under set -e a failure on the left of && does not stop the script (IR505); the contract check
 # uses the workspace's TypeScript, as CI's validator job does

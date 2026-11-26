@@ -1,0 +1,106 @@
+import ACKit
+import Observation
+
+/// The signed-in membership's notifications (notifications.list, FR-X07): newest first, unread ones marked; reading one
+/// marks it read with its version, and "Mark all as read" marks the listed unread ones in one write (IR379).
+@MainActor @Observable
+public final class NotificationsModel {
+    /// One notification as its row shows it.
+    public struct Row: Identifiable, Equatable, Sendable {
+        public let id: String
+        public let version: Double
+        public let title: String
+        public let detail: String
+        public let when: String
+        public let isRead: Bool
+    }
+
+    public enum Filter: Sendable { case all, unread }
+
+    public private(set) var notifications: Loadable<[Row]> = .loading
+    /// What the last mark came to, when it says something the list does not.
+    public private(set) var note: String?
+    public var filter: Filter = .all
+    /// A mark is being sent: the rows and "Mark all as read" are disabled, as the web disables its button while pending,
+    /// so that a second tap does not send the same ids again (and then say "0 marked") or a stale version.
+    public private(set) var isWriting = false
+    let client: CoreClient
+
+    public init(client: CoreClient) {
+        self.client = client
+    }
+
+    public func load() async {
+        notifications = await notifications.after { () async throws(CoreError) in
+            let query = Query(limit: 100, sort: QuerySort(field: .occurredAt, direction: .desc))
+            return try await client.call(Ops.NotificationsList.self, query).data.items.map(Self.row)
+        }
+    }
+
+    /// The rows of the filter.
+    public var rows: [Row] {
+        let all = notifications.value ?? []
+        return filter == .all ? all : all.filter { !$0.isRead }
+    }
+
+    /// What the list says when the loaded filter has no rows, as the web says it: under Unread, that nothing is unread.
+    public var emptyText: String? {
+        guard case .loaded = notifications, rows.isEmpty else { return nil }
+        return filter == .unread ? tr("No unread notifications") : tr("No notifications")
+    }
+
+    public var unreadCount: Int { (notifications.value ?? []).filter { !$0.isRead }.count }
+
+    /// Marks one read (opening it); one that changed meanwhile shows its latest state.
+    public func markRead(_ row: Row) async {
+        guard !row.isRead, !isWriting else { return }
+        isWriting = true
+        defer { isWriting = false }
+        do {
+            _ = try await client.call(
+                Ops.NotificationsMarkRead.self,
+                NotificationsMarkReadInput(id: row.id),
+                expectedVersion: Int(row.version)
+            )
+            note = nil
+        } catch {
+            note = Self.markRefusal(error)
+        }
+        await load()
+    }
+
+    /// Marks every listed unread notification read in one write.
+    public func markAllRead() async {
+        let ids = (notifications.value ?? []).filter { !$0.isRead }.map(\.id)
+        guard !ids.isEmpty, !isWriting else { return }
+        isWriting = true
+        defer { isWriting = false }
+        do {
+            let marked = try await client.call(Ops.NotificationsMarkAllRead.self, NotificationsMarkAllReadInput(ids: ids)).data
+            let count = marked.markedIds.count
+            note = count == 1 ? tr("1 notification marked as read") : tr("{n} notifications marked as read", ["n": String(count)])
+        } catch {
+            note = ErrorText.of(error)
+        }
+        await load()
+    }
+
+    static func markRefusal(_ error: CoreError) -> String {
+        switch error.error.code {
+        case .conflict: tr("This notification changed — the latest state is shown.")
+        case .notFound: tr("This notification is no longer available.")
+        default: ErrorText.of(error)
+        }
+    }
+
+    static func row(_ notification: CoreNotification) -> Row {
+        Row(
+            id: notification.id,
+            version: notification.version,
+            title: NotificationText.title(notification),
+            detail: NotificationText.detail(notification),
+            when: Format.dateTime(notification.occurredAt),
+            isRead: notification.readAt != nil
+        )
+    }
+}

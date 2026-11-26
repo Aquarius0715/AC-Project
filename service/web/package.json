@@ -11,13 +11,15 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present && eslint --max-warnings=0 -c e2e/eslint.config.mjs e2e && eslint --max-warnings=0 -c load/eslint.config.mjs load",
+    "lint": "npm run lint --workspaces --if-present && eslint --max-warnings=0 -c e2e/eslint.config.mjs e2e && eslint --max-warnings=0 -c load/eslint.config.mjs load && eslint --max-warnings=0 -c codegen/eslint.config.mjs codegen",
     "test": "npm run test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p e2e/tsconfig.json && tsc -p load/tsconfig.json",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p e2e/tsconfig.json && tsc -p load/tsconfig.json && tsc -p codegen/tsconfig.json",
+    "gen:swift": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON codegen/swift.ts",
     "e2e": "playwright test -c e2e/playwright.config.ts",
     "knip": "knip --no-progress"
   },
   "devDependencies": {
+    "@ac/web": "0.1.0",
     "@eslint-community/eslint-plugin-eslint-comments": "4.8.1",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.65.1",

@@ -45,6 +45,30 @@ ensure_client ac-customer-web "Customer app" "${CUSTOMER_WEB_URL%/}" ac-customer
 ensure_client ac-partner-web "Partner app" "${PARTNER_WEB_URL%/}" ac-partner
 ensure_client ac-technician-web "Technician app" "${TECHNICIAN_WEB_URL%/}" ac-technician
 
+# The iOS apps (DEC-112): public clients (no secret on a phone) with PKCE, returning to the app's own URL scheme. The
+# same claims as the web apps' clients; the redirect does not depend on the environment's addresses.
+# ensure_native_client CLIENT_ID TITLE SCHEME THEME creates the client when it is missing.
+ensure_native_client() {
+  cid=$("$KC" get clients -r ac -q "clientId=$1" --fields id --format csv --noquotes)
+  if [ -z "$cid" ]; then
+    "$KC" create clients -r ac -s "clientId=$1" -s "name=$2" -s publicClient=true \
+      -s standardFlowEnabled=true -s directAccessGrantsEnabled=false \
+      -s "redirectUris=[\"$3://oauth/callback\"]" -s 'attributes."pkce.code.challenge.method"=S256' \
+      -s "attributes.\"post.logout.redirect.uris\"=$3://oauth/signed-out"
+    cid=$("$KC" get clients -r ac -q "clientId=$1" --fields id --format csv --noquotes)
+    for claim in tenant_id membership_id role; do
+      "$KC" create "clients/$cid/protocol-mappers/models" -r ac -s "name=$claim" -s protocol=openid-connect \
+        -s protocolMapper=oidc-usermodel-attribute-mapper -s consentRequired=false \
+        -s "config.\"user.attribute\"=$claim" -s "config.\"claim.name\"=$claim" -s 'config."jsonType.label"=String' \
+        -s 'config."id.token.claim"=true' -s 'config."access.token.claim"=true' -s 'config."userinfo.token.claim"=true'
+    done
+    echo "realm ac: client $1 created"
+  fi
+  "$KC" update "clients/$cid" -r ac -s "attributes.login_theme=$4"
+}
+ensure_native_client ac-customer-ios "Customer iOS app" ac-customer ac-customer
+ensure_native_client ac-technician-ios "Technician iOS app" ac-technician ac-technician
+
 # HQ Admin has its own title and accent
 id=$("$KC" get clients -r ac -q clientId=ac-admin-web --fields id --format csv --noquotes)
 "$KC" update "clients/$id" -r ac -s 'attributes.login_theme=ac-hq'
