@@ -106,6 +106,25 @@ export function oidcCookieOptions(maxAge = 600) {
   return { httpOnly: true, sameSite: "lax" as const, secure: httpsApp(), path: "/bff/auth", maxAge };
 }
 
+// The e-mail address of this app's last sign-in (sealed), kept for 30 days on /bff/auth only. All four apps share one
+// single sign-on session of the identity provider: a sign-in fills in this app's own account (login_hint), also after
+// the session held another app's account and was ended for this sign-in (IR876).
+export const LOGIN_HINT_COOKIE = `${httpsApp() ? "__Secure-" : ""}ac_login_hint_${APP_ROLE}`;
+const loginHint = z.object({ email: z.email() });
+
+export function loginHintCookieOptions() {
+  return { httpOnly: true, sameSite: "lax" as const, secure: httpsApp(), path: "/bff/auth", maxAge: 30 * 24 * 60 * 60 };
+}
+
+/** The e-mail address the hint cookie holds, or null when there is none or it does not open. */
+export const loginHintOf = (cookie: string | undefined): string | null => unsealAs(cookie, loginHint)?.email ?? null;
+
+/** The sealed hint cookie value for an access token's e-mail claim, or null when the token has none. */
+export function loginHintFor(accessToken: string): string | null {
+  const claims = loginHint.safeParse(jwtClaims(accessToken));
+  return claims.success ? seal(claims.data) : null;
+}
+
 /** The access token claims a session needs: the tenant, the membership and one of the four roles. */
 /** The identity provider's token endpoint answer (authorization code and refresh grants). */
 export const tokenResponse = z.object({ access_token: z.string(), refresh_token: z.string().optional(), expires_in: z.number() });

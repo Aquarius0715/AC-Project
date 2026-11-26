@@ -653,7 +653,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:alert.read | admin:alert.policy.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-T07, DD-A05, DD-T12, DD-P05, DD-P02",
+                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:alert.read | admin:alert.policy.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-T12, DD-P05, DD-P02",
                 "consumes": [
                     "application/json"
                 ],
@@ -1371,7 +1371,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:control.execute:self | admin:automation.policy.write | admin:alert.policy.write\nValidation: D01; input constraints in the corresponding DD; IR215 records skips whose own trigger held (reason in automation_runs)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A11, DD-A12, DD-C04, DD-C05, DD-A05",
+                "description": "Authorization: client:control.execute:self | admin:automation.policy.write | admin:alert.policy.write\nValidation: D01; input constraints in the corresponding DD; IR215 records skips whose own trigger held (reason in automation_runs)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A11",
                 "consumes": [
                     "application/json"
                 ],
@@ -1674,6 +1674,98 @@
                 }
             }
         },
+        "/v1/automations/start-proposals": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: client:control.execute:self\nValidation: D01; completed local weekdays and independently measured power transitions\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-C04",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "automations"
+                ],
+                "summary": "automations.startProposals (read)",
+                "operationId": "automations.startProposals",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/control.StartProposal"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/automations/{id}": {
             "put": {
                 "security": [
@@ -1848,6 +1940,127 @@
                                     "properties": {
                                         "data": {
                                             "$ref": "#/definitions/control.Deleted"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/automations/{id}/start-proposals": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: client:control.execute:self\nValidation: D01; expectedVersion required; rechecks evidence and applies one weekday atomically\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C04",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "automations"
+                ],
+                "summary": "automations.approveStartProposal (write)",
+                "operationId": "automations.approveStartProposal",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "all: required (target automations, read automations.startProposals)",
+                        "name": "X-Expected-Version",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "input; the path parameters come from the route",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/control.StartProposalApproval"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/control.Automation"
                                         }
                                     }
                                 }
@@ -4158,7 +4371,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:control.execute | technician:control.diagnose:job-required | admin:control.execute\nValidation: D01; input constraints in the corresponding DD; IR46 restriction action table; IR47 derived connection/powerSignal OFFLINE; IR74 client omits reason; IR94 technician write table (assignment and work window, jobId required when typed); IR109 group control sends one command per selected unit (owner only); a command asked for here is always source ui (the voice channel was withdrawn, IR648)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C03, DD-T10, DD-A11 through automations.fire, DD-C04, DD-C05, DD-A02, DD-C14 · Input versions: expectedUnitVersion=UnitDetail.version",
+                "description": "Authorization: client:control.execute | technician:control.diagnose:job-required | admin:control.execute\nValidation: D01; input constraints in the corresponding DD; IR46 restriction action table; IR47 derived connection/powerSignal OFFLINE; IR74 client omits reason; IR94 technician write table (assignment and work window, jobId required when typed); IR109 group control sends one command per selected unit (owner only); a command asked for here is always source ui (the voice channel was withdrawn, IR648)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C03, DD-T10, DD-A11 through automations.fire, DD-C04, DD-C05, DD-C14 · Input versions: expectedUnitVersion=UnitDetail.version",
                 "consumes": [
                     "application/json"
                 ],
@@ -4265,7 +4478,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | technician:assigned | admin:control.execute | admin:restriction.read | admin:restriction.override | admin:automation.policy.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A09, DD-A12, DD-C03, DD-C12, DD-T10, DD-A02, DD-A16, DD-C14",
+                "description": "Authorization: client:self | technician:assigned | admin:control.execute | admin:restriction.read | admin:restriction.override | admin:automation.policy.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A09, DD-A12, DD-C03, DD-C12, DD-A16, DD-C14",
                 "consumes": [
                     "application/json"
                 ],
@@ -6816,7 +7029,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: technician:device.maintain:assigned-valid-job | admin:device.write\nValidation: D01; input constraints in the corresponding DD; IR43 sensorTypes⊆IoTModel.sensors (DEC-105: the iotModelId, else the planned unit's IoT model; none allows no sensors; sensorTypes omitted = every sensor of the model); unitId omitted registers an unplanned device (HQ only); IR94 technician write table (assignment and work window, jobId required when typed)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T11, DD-A04, DD-T16",
+                "description": "Authorization: technician:device.maintain:assigned-valid-job | admin:device.write\nValidation: D01; input constraints in the corresponding DD; IR43 sensorTypes⊆IoTModel.sensors (DEC-105: the iotModelId, else the planned unit's IoT model; none allows no sensors; sensorTypes omitted = every sensor of the model); unitId omitted registers an unplanned device (HQ only); IR94 technician write table (assignment and work window, jobId required when typed)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T11, DD-A04",
                 "consumes": [
                     "application/json"
                 ],
@@ -8351,7 +8564,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: technician:control.diagnose:assigned-history | admin:job.read | admin:control.execute\nValidation: D01; SR08/SR09\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-T10, DD-A02 · Query: filters none · sort id,createdAt (default createdAt desc;id asc)",
+                "description": "Authorization: technician:control.diagnose:assigned-history | admin:job.read | admin:control.execute\nValidation: D01; SR08/SR09\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-T10 · Query: filters none · sort id,createdAt (default createdAt desc;id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -8577,7 +8790,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: technician:control.diagnose:assigned-history | admin:job.read | admin:control.execute\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-T10, DD-A02",
+                "description": "Authorization: technician:control.diagnose:assigned-history | admin:job.read | admin:control.execute\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign:",
                 "consumes": [
                     "application/json"
                 ],
@@ -12975,7 +13188,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR86 expired unanswered offer: NOT_FOUND for contractor\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A06, DD-C09, DD-P01, DD-P02, DD-P05, DD-P08, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T10, DD-C17, DD-T13, DD-P10, DD-P03, DD-T02, DD-T07, DD-T16",
+                "description": "Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR86 expired unanswered offer: NOT_FOUND for contractor\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A06, DD-C09, DD-P02, DD-P05, DD-P08, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T10, DD-C17, DD-T13, DD-P10, DD-P03, DD-T02, DD-T07, DD-T16",
                 "consumes": [
                     "application/json"
                 ],
@@ -16966,7 +17179,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: technician:assigned-valid-job\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T08, DD-T13",
+                "description": "Authorization: technician:assigned-valid-job\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T13",
                 "consumes": [
                     "application/json"
                 ],
@@ -22447,7 +22660,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:billing.read | contractor:own-company:approved-or-paid\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A23, DD-P10",
+                "description": "Authorization: admin:billing.read | contractor:own-company:approved-or-paid\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A23",
                 "consumes": [
                     "application/json"
                 ],
@@ -24087,7 +24300,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self-customer:kind=alert-or-default_alert | admin:alert.policy.read:kind=alert-or-default_alert | admin:automation.policy.read:kind=automation\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A05, DD-A11, DD-A12, DD-C15",
+                "description": "Authorization: client:self-customer:kind=alert-or-default_alert | admin:alert.policy.read:kind=alert-or-default_alert | admin:automation.policy.read:kind=automation\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A11",
                 "consumes": [
                     "application/json"
                 ],
@@ -25192,7 +25405,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:job.read | admin:billing.read | contractor:own-company\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A21, DD-A23, DD-P10 · Query: filters contractorOrgId · sort id,createdAt,effectiveFrom (default effectiveFrom desc;id asc)",
+                "description": "Authorization: admin:job.read | admin:billing.read | contractor:own-company\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A21, DD-P10 · Query: filters contractorOrgId · sort id,createdAt,effectiveFrom (default effectiveFrom desc;id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -27731,7 +27944,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:automation.policy.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR98 allergenObservation source rows\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-C07, DD-T03, DD-A05, DD-A12, DD-C01 · Query: filters none · sort observedAt (default observedAt asc;sensorId asc;id asc)",
+                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:automation.policy.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR98 allergenObservation source rows\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-C07, DD-T03, DD-C01 · Query: filters none · sort observedAt (default observedAt asc;sensorId asc;id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -27886,7 +28099,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:automation.policy.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-P04, DD-T03",
+                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:automation.policy.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign:",
                 "consumes": [
                     "application/json"
                 ],
@@ -29161,7 +29374,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:asset.read | admin:control.execute:scope-candidate-read-only | admin:device.read:scope-candidate-read-only | admin:job.read:scope-candidate-read-only | admin:contract.read:scope-candidate-read-only | admin:restriction.read:scope-candidate-read-only | admin:automation.policy.read:scope-candidate-read-only | admin:alert.policy.read:scope-candidate-read-only | admin:energy.read:scope-candidate-read-only | admin:mrv.read:scope-candidate-read-only | admin:offset.read:scope-candidate-read-only\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR76 technician before work window: work-not-started state; IR213 latestMeasurements: latest reading per metric with read-time quality (stale past the sensor limit)\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-A12, DD-C03, DD-C07, DD-P04, DD-T02, DD-T10, DD-C04, DD-C05, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T11, DD-A04, DD-A09, DD-A11, DD-A05, DD-C14, DD-T12, DD-P05, DD-P10, DD-P02, DD-P03, DD-T13, DD-A06, DD-T07",
+                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:asset.read | admin:control.execute:scope-candidate-read-only | admin:device.read:scope-candidate-read-only | admin:job.read:scope-candidate-read-only | admin:contract.read:scope-candidate-read-only | admin:restriction.read:scope-candidate-read-only | admin:automation.policy.read:scope-candidate-read-only | admin:alert.policy.read:scope-candidate-read-only | admin:energy.read:scope-candidate-read-only | admin:mrv.read:scope-candidate-read-only | admin:offset.read:scope-candidate-read-only\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR76 technician before work window: work-not-started state; IR213 latestMeasurements: latest reading per metric with read-time quality (stale past the sensor limit)\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-A12, DD-C03, DD-C07, DD-P04, DD-T02, DD-T10, DD-C04, DD-C05, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T11, DD-A04, DD-C14, DD-T12, DD-P05, DD-P10, DD-P02, DD-P03, DD-T13, DD-A06, DD-T07",
                 "consumes": [
                     "application/json"
                 ],
@@ -29621,7 +29834,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self-customer:own-customer-policies | admin:asset.write | admin:alert.policy.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR108 only policies of the unit customer; the default policy is implicit and cannot be listed or removed\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C03, DD-C15, DD-A02, DD-A05",
+                "description": "Authorization: client:self-customer:own-customer-policies | admin:asset.write | admin:alert.policy.write\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR108 only policies of the unit customer; the default policy is implicit and cannot be listed or removed\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C03, DD-C15, DD-A02",
                 "consumes": [
                     "application/json"
                 ],
@@ -32512,6 +32725,58 @@
                 },
                 "phase": {
                     "type": "string"
+                }
+            }
+        },
+        "control.StartProposal": {
+            "type": "object",
+            "properties": {
+                "automationId": {
+                    "type": "string"
+                },
+                "endLocal": {
+                    "type": "string"
+                },
+                "from": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "occurrences": {
+                    "type": "integer"
+                },
+                "supportDates": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "to": {
+                    "type": "string"
+                },
+                "unitId": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                },
+                "weekday": {
+                    "type": "integer"
+                }
+            }
+        },
+        "control.StartProposalApproval": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "proposalId": {
+                    "type": "string"
+                },
+                "weekday": {
+                    "type": "integer"
                 }
             }
         },

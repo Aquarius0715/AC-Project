@@ -10,13 +10,14 @@ import { actionOutcome, policyText, stateTone, stateWord, type ActionKind, type 
 import { cancelRestriction, deferRestriction, exemptRestriction, overrideRestriction, reconcileUnits, retryUnits } from "../../actions";
 import { Icon } from "@ac/web/components/Icon";
 import { DateTimeSelect } from "@ac/web/components/TimeSelect";
+import { permissionLabel } from "@ac/web/lib/permissionLabels";
 
 interface Live {
   now: string; r: ApiRestriction; units: UnitRow[]; bypass: string[]; canWrite: boolean; canOverride: boolean; canAudit: boolean;
   /** formatted on the server in the display language and time zone (IR282) */
   period: string | null; intent: string; audit: { time: string; title: string; detail: string }[];
 }
-const ops: Record<ActionKind, string> = { defer: "restrictions.defer", exempt: "restrictions.exempt", cancel: "restrictions.cancel", override: "restrictions.override · restriction.override" };
+const ops: Record<ActionKind, string> = { defer: "restrictions.defer", exempt: "restrictions.exempt", cancel: "restrictions.cancel", override: "restrictions.override" };
 const kinds: ActionKind[] = ["defer", "exempt", "cancel", "override"];
 
 /** Grace periods, exceptions, cancellation and manual release (FR-A10) in API mode. Each action card states the
@@ -99,10 +100,11 @@ export function ExceptionView({ live }: Readonly<{ live: Live }>) {
               [t("Policy"), policyText(r.policy, t)], [t("Units"), live.units.map((u) => `${u.name} · ${u.apply}/${u.release}`).join(", ") || "—"],
               ...(isRelease ? [] : [[t("Cause invoices"), String(r.causeInvoiceIds?.length ?? 0)] as [string, string]]),
               [t("Grace / exception"), live.period ?? t("none")], [t("Release intent"), live.intent],
-              [t("Your permissions"), [live.canWrite && "restriction.write", live.canOverride && "restriction.override", live.canAudit && "audit.read"].filter(Boolean).join(" · ") || t("read only")],
+              // the permissions by their word labels, as Access & roles names them (IR879)
+              [t("Your permissions"), [live.canWrite && "restriction.write", live.canOverride && "restriction.override", live.canAudit && "audit.read"].filter((p) => typeof p === "string").map((p) => permissionLabel(p, t)).join(" · ") || t("read only")],
             ]} />
           </Card>
-          {live.canAudit && <Card title={t("Audit")} sub="audit.read">{live.audit.length === 0 ? <p className="text-xs text-muted-foreground">{t("No audit entries yet.")}</p> : <Timeline items={live.audit} />}</Card>}
+          {live.canAudit && <Card title={t("Audit")} sub={permissionLabel("audit.read", t)}>{live.audit.length === 0 ? <p className="text-xs text-muted-foreground">{t("No audit entries yet.")}</p> : <Timeline items={live.audit} />}</Card>}
         </div>
       </div>
     </Page>

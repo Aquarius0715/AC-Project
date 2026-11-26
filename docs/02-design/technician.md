@@ -15,7 +15,7 @@ This design defines features, screen fields, states, and exceptions based on the
 
 ## Inputs and Responsibilities
 
-The primary source is the [Original Company Requirements (SRC-06)](../00-prepare/sources/company-requirements-original.txt). Screens, inputs, states, and acceptance criteria follow the requirements reorganized from this source. Inputs are the [Role Requirements](../01-requirements/technician.md) and [Common Requirements](../01-requirements/common.md). Required reading is the [Common Detailed Design](common.md) and [UIUX Specification](../03-uiux/UIUXSpecification.md). The following describes frontend fields, displays, and mock behavior. Registration, assignment, payment receipt, restrictions, and audit on the screen are state changes in shared mock memory. This does not request server implementation or database design.
+The primary source is the [Original Company Requirements (SRC-06)](../00-prepare/sources/company-requirements-original.txt). Screens, inputs, states, and acceptance criteria follow the requirements reorganized from this source. Inputs are the [Role Requirements](../01-requirements/technician.md) and [Common Requirements](../01-requirements/common.md). Required reading is the [Common Detailed Design](common.md) and [UIUX Specification](../03-uiux/UIUXSpecification.md). The following describes frontend fields, displays, and mock behavior. Registration, assignment, payment receipt, restrictions, and audit on the screen are state changes in shared mock memory. This does not request server implementation or database design. As built (IR257) the apps run against the Core API (`DATA_SOURCE=api`): these changes are writes of the Core API, stored in its database with their events and audit ([backend architecture](backend-architecture.md), [database design](database-design.md)); the shared mock memory is the Phase 1A demo mode only.
 
 Treat route parameters as untrusted input and always validate them. Service names in the table are logical operations in the shared Repository. Rows with the same route describe different functions on one screen. Every row supports loading, empty, error, forbidden, and not-found displays. Show retry only for recoverable errors. For forbidden and not-found, follow IR57 and do not show retry.
 
@@ -23,28 +23,28 @@ Treat route parameters as untrusted input and always validate them. Service name
 
 | Design ID / requirement | Route / main component | Read and action contracts | Input, processing, validation | Errors and prohibited actions |
 |---|---|---|---|---|
-| DD-T01 / FR-T01 | `/technician` / `TechnicianOverview` | `jobs.list`, `alerts.list`, `summaries.get`, `units.list` | Filter by period and severity. Check assignments and deadlines in the service | Exclude jobs assigned to others from results and summaries |
-| DD-T02 / FR-T02 | `/technician/units/:id` / `DiagnosticUnit` | `units.get`, `devices.list`, `alerts.list`, `jobs.list`, `jobs.get` | View unit ID and supported features. Clearly identify items outside maintenance scope | Distinguish unregistered units from disconnected units |
-| DD-T03 / FR-T03 | `/technician/units/:id` / `TelemetryPanel` | `telemetry.series`, `telemetry.summary`, `devices.events` | Select metric and period (1h / 24h / 7d, IR283). API mode reads the period when the page loads; Phase 1A uses only predefined events | Do not show old values as live: an offline unit's values say “last known · observed …” and the page says nothing on it is real-time (IR283) |
-| DD-T04 / FR-T04 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Select normal/needs attention/not inspected/not applicable for each component. Record findings and measurement evidence. Do not default to normal | Require reasons for not applicable or not inspected. Do not replace actual measurements with demo diagnosis results |
-| DD-T05 / FR-T05 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Outdoor units use the shared schema with a separate component group | Do not claim detection of tiny leaks without a selected sensor |
-| DD-T06 / FR-T06 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Record each measurement's value, unit, observation time, and inspector. Operating procedures and installation instructions are outside this design | Do not save an unmeasured value as 0 or normal |
-| DD-T07 / FR-T07 | `/technician/units/:id/alerts` / `DiagnosticEvidence` | `alerts.list`, `alerts.get`, `alerts.acknowledge`, `alerts.resolve`, `alerts.evidence`, `units.get`, `jobs.get` | Acknowledgement only marks the alert as acknowledged. Resolution requires remeasurement or a reason recorded by an authorized person | Do not infer theft from connection loss alone. Treat removal detection as a separate event |
-| DD-T08 / FR-T08 | `/technician/jobs/:id` / `JobWorkspace` | `jobs.get`, `jobs.submit`, `reports.get`, `jobs.start`, `jobs.resumeRework`, `units.get`, `jobs.acknowledgeAssignment` | Check active assignment and start conditions. Submission enters quality-review waiting state | Reject submission after assignment expiry or cancellation. Keep the draft if sending fails |
-| DD-T09 / FR-T09 | `/technician/jobs/:id` / `ReportEditor` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `attachments.add`, `attachments.getContent`, `units.get` | Report body: 10–4000 characters. Photos: JPEG/PNG, at most 5MiB each, at most 10 (provisional). Part quantities must be greater than 0 | Drafts may be incomplete. Validate the schema on submission. Reselect images after processing failure, while keeping text |
-| DD-T10 / FR-T10 | `/technician/units/:id/control` / `DiagnosticControl` | `commands.create`, `commands.get`, `diagnosticRuns.create`, `diagnosticRuns.get`, `units.get`, `jobs.get`, `diagnosticRuns.list`, `commands.list` | Check `control.diagnose` permission, unit capabilities, reason, and test-run duration (1–15 minutes, provisional) | Do not use test runs to bypass contract restrictions. Do not automatically resend after expiry |
-| DD-T11 / FR-T11 | `/technician/devices` / `DeviceMaintenance` | `devices.list`, `devices.register`, `devices.bind`, `devices.check`, `devices.calibrate`, `devices.updateFirmware`, `devices.get`, `units.list`, `units.get`, `jobs.list`, `devices.calibrations`, `devices.operations` | Serial numbers must be unique. Set unitId and sensor types. Enter unit, reference value, and date/time for calibration. Choose supported firmware versions | Do not start updates offline. Do not show the new version as applied after update failure |
-| DD-T12 / FR-T12 | `/technician/devices/:id` / `DeviceEvents` | `devices.get`, `devices.events`, `alerts.get`, `alerts.acknowledge`, `devices.addResponseNote`, `devices.list`, `units.list`, `units.get`, `jobs.list` | Show eventType and detection evidence. Use a dedicated simulated event for removal | Restored communication does not automatically clear removal alerts |
-| DD-T13 / FR-T13 | `/technician` (Scan QR), `/technician/jobs/:id` (Check in) / `QrScan`, `SiteCheckIn` | `units.resolveQr`, `jobs.checkIn`, `jobs.get`, `units.get`, `units.list`, `jobs.list` | Assigned units only; device fix ≤ 200 m from the property pin (server-measured, IR825), QR match, inside the window; manual reason 1–1000 | Unassigned label → Page unavailable; outside window rejected as jobs.start |
-| DD-T14 / FR-T14 | `/technician/jobs/:id` / `PartsAndTime` | `jobs.saveDraft`, `jobs.pauseWork`, `parts.list` | Parts qty > 0, receipt for bought-locally; refrigerant kg ≥ 0 | Read-only after submit |
-| DD-T15 / FR-T15 | `/technician/jobs/:id` / `CustomerSignOff` | `reports.signOff`, `reports.get` | Signature or absence reason with site photo; bound to report version | Editing the draft clears the sign-off |
-| DD-T16 / FR-T16 | `/technician/jobs/:id` / `InstallationWorkspace` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `devices.register`, `devices.bind` | Every checklist item has a result or a reason; model equals the unit's model; serial; name plate, indoor and outdoor photos; sign-off | VALIDATION names the field; a returned report keeps the unit planned |
+| DD-T01 / FR-T01 | `/technician` / `OverviewView` | `jobs.list`, `alerts.list`, `summaries.get`, `units.list` | Filter by period and severity. Check assignments and deadlines in the service | Exclude jobs assigned to others from results and summaries |
+| DD-T02 / FR-T02 | `/technician/units/:id` / `TechUnitView` | `units.get`, `devices.list`, `alerts.list`, `jobs.list`, `jobs.get` | View unit ID and supported features. Clearly identify items outside maintenance scope | Distinguish unregistered units from disconnected units |
+| DD-T03 / FR-T03 | `/technician/units/:id` / `TechUnitView` | `telemetry.series`, `devices.events` | Select metric and period (1h / 24h / 7d, IR283). API mode reads the period when the page loads; Phase 1A uses only predefined events | Do not show old values as live: an offline unit's values say “last known · observed …” and the page says nothing on it is real-time (IR283) |
+| DD-T04 / FR-T04 | `/technician/jobs/:id` / `WorkspaceView` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Select normal/needs attention/not inspected/not applicable for each component. Record findings and measurement evidence. Do not default to normal | Require reasons for not applicable or not inspected. Do not replace actual measurements with demo diagnosis results |
+| DD-T05 / FR-T05 | `/technician/jobs/:id` / `WorkspaceView` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Outdoor units use the shared schema with a separate component group | Do not claim detection of tiny leaks without a selected sensor |
+| DD-T06 / FR-T06 | `/technician/jobs/:id` / `WorkspaceView` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Record each measurement's value, unit, observation time, and inspector. Operating procedures and installation instructions are outside this design | Do not save an unmeasured value as 0 or normal |
+| DD-T07 / FR-T07 | `/technician/units/:id/alerts` / `AlertEvidenceView` | `alerts.list`, `alerts.acknowledge`, `alerts.resolve`, `alerts.evidence`, `units.get`, `jobs.get` | Acknowledgement only marks the alert as acknowledged. Resolution requires remeasurement or a reason recorded by an authorized person | Do not infer theft from connection loss alone. Treat removal detection as a separate event |
+| DD-T08 / FR-T08 | `/technician/jobs/:id` / `WorkspaceView` | `jobs.get`, `jobs.submit`, `reports.get`, `jobs.resumeRework`, `units.get`, `jobs.acknowledgeAssignment` | Check active assignment and start conditions. Submission enters quality-review waiting state | Reject submission after assignment expiry or cancellation. Keep the draft if sending fails |
+| DD-T09 / FR-T09 | `/technician/jobs/:id` / `WorkspaceView` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `attachments.add`, `attachments.getContent`, `units.get` | Report body: 10–4000 characters. Photos: JPEG/PNG, at most 5MiB each, at most 10 (provisional). Part quantities must be greater than 0 | Drafts may be incomplete. Validate the schema on submission. Reselect images after processing failure, while keeping text |
+| DD-T10 / FR-T10 | `/technician/units/:id/control` / `ControlView` | `commands.create`, `diagnosticRuns.create`, `units.get`, `jobs.get`, `diagnosticRuns.list`, `commands.list` | Check `control.diagnose` permission, unit capabilities, reason, and test-run duration (1–15 minutes, provisional) | Do not use test runs to bypass contract restrictions. Do not automatically resend after expiry |
+| DD-T11 / FR-T11 | `/technician/devices` / `TechDevicesView` | `devices.list`, `devices.register`, `devices.bind`, `devices.check`, `devices.calibrate`, `devices.updateFirmware`, `devices.get`, `units.list`, `units.get`, `jobs.list`, `devices.calibrations`, `devices.operations` | Serial numbers must be unique. Set unitId and sensor types. Enter unit, reference value, and date/time for calibration. Choose supported firmware versions | Do not start updates offline. Do not show the new version as applied after update failure |
+| DD-T12 / FR-T12 | `/technician/devices/:id` / `TechDevicesView` | `devices.get`, `devices.events`, `alerts.get`, `alerts.acknowledge`, `devices.addResponseNote`, `devices.list`, `units.list`, `units.get`, `jobs.list` | Show eventType and detection evidence. Use a dedicated simulated event for removal | Restored communication does not automatically clear removal alerts |
+| DD-T13 / FR-T13 | `/technician` (Scan QR), `/technician/jobs/:id` (Check in) / `QrScan`, `WorkspaceView` | `units.resolveQr`, `jobs.checkIn`, `jobs.get`, `units.get`, `units.list`, `jobs.list` | Assigned units only; device fix ≤ 200 m from the property pin (server-measured, IR825), QR match, inside the window; manual reason 1–1000 | Unassigned label → Page unavailable; outside window rejected as jobs.start |
+| DD-T14 / FR-T14 | `/technician/jobs/:id` / `WorkspaceView` | `jobs.saveDraft`, `jobs.pauseWork`, `parts.list` | Parts qty > 0, receipt for bought-locally; refrigerant kg ≥ 0 | Read-only after submit |
+| DD-T15 / FR-T15 | `/technician/jobs/:id` / `WorkspaceView`, `SignModal` | `reports.signOff`, `reports.get` | Signature or absence reason with site photo; bound to report version | Editing the draft clears the sign-off |
+| DD-T16 / FR-T16 | `/technician/jobs/:id` / `WorkspaceView` | `jobs.get`, `jobs.saveDraft`, `jobs.submit` | Every checklist item has a result or a reason; model equals the unit's model; serial; name plate, indoor and outdoor photos; sign-off | VALIDATION names the field; a returned report keeps the unit planned |
 
 ## Shared Implementation Steps
 
 1. Check the session and permission scope. Validate IDs and URL filters against schemas.
 2. Read in the route's Server Component through the DAL (API mode) or from the demo fixtures (Phase 1A); pure mappers in `shared/lib` turn the results into screen models.
-3. Forms use controlled inputs with a pure validator per form in `shared/lib`; the validators also check unit capabilities and periods, and the Core API checks again. Forms move to React Hook Form with Zod in their DEC-75 phase.
+3. Forms use controlled inputs with a pure validator per form in `shared/lib`; the validators also check unit capabilities and periods, and the Core API checks again. As built no form uses React Hook Form yet; the move named in DEC-75 has not been made.
 4. Immediately before a mutation, check the target version, permissions, and current state. For major actions, also confirm the target and reason.
 5. Write through the route's Server Action with the row version and an Idempotency-Key; the Core API records the event and audit with a correlation ID, and the route renders again with the latest state (`refresh()`). The Phase 1A demo changes the tab's shared demo store instead.
 6. Keep a waiting indicator visible while awaiting a response. Show success, denial, and failure separately. Keep form inputs when submission fails.
@@ -67,14 +67,13 @@ Scope: FR-T01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `jobs.l
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| from / to | date/required | Default: today; maximum 366 days. Convert YYYY-MM-DD calendar dates in the display timezone to UTC Instants (IR74) | Schedule |
-| status | enum/optional | assigned/in_progress/on_hold/submitted/rework_requested/completed/all (all means omit status, IR90) | Progress |
-| severity | enum/optional | critical/warning/all (all means omit filters.severity, IR74) | Priority |
+| tab | enum/optional | `today` (default: today's timeline in Kuala Lumpur time) / `all` (every assigned job, Sidebar › Assigned jobs) | Schedule |
+| sort | enum/optional | `severity` (default, most severe first) / `dueAt` (soonest first) / `status` (earliest stage first), IR34 | Priority and progress |
 | summary | Read-only | Assigned unit count, not started, overdue | Assigned-scope summary |
 
 **Steps**
 
-1. Open assigned jobs for today or the selected period. Sort by alert severity, deadline, and progress. Open unit details or the work screen.
+1. Open today's assigned jobs or all of them (`tab`). Sort by alert severity, deadline, or progress (`sort`); as built there is no period, status or severity filter. Open unit details or the work screen.
 2. Apply these business conditions to reads and actions. “Not addressed” means jobs assigned to the user that have not started, not all requested jobs. Internal users viewing multiple jobs must still stay within their tenant and assigned scope.
 3. This screen is read-only. For zero scheduled jobs, show an empty state and a way to view past history.
 4. Queries to update: `jobs / assignments / alerts`.
@@ -118,14 +117,14 @@ Scope: FR-T02 / Main display pattern: **UI-DETAIL**. Service boundary: `units.ge
 
 **Source mapping**: SRC-06 BIZ-08, BIZ-11 → FR-T03 → DD-T03. Source category: original company requirements SRC-06 + design additions. Design addition: choosing data series and displaying data quality. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-T03 / Main display pattern: **UI-DETAIL** and **UI-ANALYSIS**. Service boundary: `telemetry.series, telemetry.summary, devices.events`.
+Scope: FR-T03 / Main display pattern: **UI-DETAIL** and **UI-ANALYSIS**. Service boundary: `telemetry.series, devices.events`.
 
 **Initial view and prerequisites**: The user may view the target unit's telemetry. Connection information can be shown even without sensors. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
 | unitId / metric | Required | Within assignment; supported sensor | Target series |
-| period / from / to | enum and ISO datetime/required | 1h/24h/7d/custom; default: 24h. 1h/24h are rolling windows, 7d uses calendar days, custom is at most 35 days (telemetry.series, IR121 item 2, IR213) | Period |
+| period / from / to | enum and ISO datetime/required | 1h/24h/7d; default: 24h. 1h/24h are rolling windows, 7d uses Kuala Lumpur calendar days (IR213). As built the screen offers no custom range; `telemetry.series` itself takes a custom from/to of at most 35 days (IR121 item 2) | Period |
 | observedAt / receivedAt | Read-only | UTC | Freshness |
 | staleAfterSeconds | Read-only | From sensor policy; demo: 120 seconds | Stale check |
 | eventId / version | Read-only | Duplicate and ordering control | Update basis |
@@ -135,7 +134,7 @@ Scope: FR-T03 / Main display pattern: **UI-DETAIL** and **UI-ANALYSIS**. Service
 1. Select metric and period. Check sensor, power, operation, and connection values and their times. Demo update events change values. Make stopped updates clear when communication is lost.
    - As built (IR283, IR606): the metric and the period are URL keys (`metric` opens Monitoring, `period` 1h / 24h / 7d). An hour shows its readings; a day and a week read the whole period as 5- and 60-minute averages of the valid readings (`telemetry.series` with `bucketMinutes`, IR605), so the charts cover their period. Up to three other metrics show their latest value and the period's slots. The events of the period are the unit's alert raises, acknowledgements and resolutions and its device's connection, power and tamper events (`devices.list` → `devices.events` with from / to).
 2. Keep observation time (measured on site) separate from receipt time (received by the server). Mark data stale after staleAfterSeconds. Do not overwrite current values with older events. Keep series units fixed and leave gaps where data is missing.
-3. Keep latest values and time-series charts consistent using the same eventId and version. Unsubscribe when leaving the screen or changing scope.
+3. Keep latest values and time-series charts consistent using the same eventId and version. As built the page subscribes to nothing: it shows the values as of its render, with their times and read-time quality from the Core API, and a reload reads them again.
 4. Queries to update: `telemetry / unit summary`.
 
 **Boundary cases and failures**: Reordered or duplicate events must not roll values back. While offline, the last received value may remain with its timestamp, but must not be shown as live.
@@ -165,7 +164,7 @@ Scope: FR-T04 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, 
 2. The target group is `indoor`. Components are `filter / evaporator_coil / blower_motor / blower_fan / drain_pipe / drain_pan / outlet / louver`. The initial result is `null` (not entered). To submit without inspection, explicitly choose `not_inspected` and enter a reason. If the unit has no such component, choose `not_applicable` and record a reason.
 3. Link inspection results to the report version, author, and observation time. Keep sensor estimates as separate evidence. Do not overwrite original sensor data with on-site inspection results.
 4. Queries to update: `report draft / inspection items`.
-5. Tabs (IR115, Figma Technician 02-2/02-3/02-29): the URL `tab` selects the checklist group — `tab=indoor` (default), `tab=outdoor`, `tab=electrical` (DD-T05/DD-T06 use the same layout). The side view switch Readings / Parts & refrigerant / Time on site (DD-T14) is local state, not a URL key; photos attach to components and readings, and the work report (submit, customer sign-off DD-T15) is the footer panel, not a tab.
+5. Tabs (IR115, Figma Technician 02-2/02-3/02-29): the checklist group — indoor (default), outdoor, electrical (DD-T05/DD-T06 use the same layout), and Installation for an installation job (DD-T16). As built the group is not a URL key: the workspace keeps the last group opened for each job while the app is open, and opens on the first group of the unit's service scope otherwise. The side view switch Readings / Parts & refrigerant / Time on site (DD-T14) is local state, not a URL key; photos attach to components and readings, and the work report (submit, customer sign-off DD-T15) is the footer panel, not a tab.
    - As built (IR352, Figma 423:204): each component shows its own readings and the report photos linked to its finding (`evidenceIds`). A finding that needs attention, or already has evidence, offers “+ Add reading” and “+ Link photo”; the latter lists the report's ready photos not yet linked to it. Each linked photo has an unlink button.
 
 **Boundary cases and failures**: Reject missing entries, measurements without units, not-inspected results without reasons, and photos from other jobs. Never default to normal and treat uninspected work as complete. After the viewing window ends — completion releases the assignment (IR234), or a reassignment / cancellation revokes it — `/technician/jobs/:id` shows the history snapshot (status, completion, whether the report was accepted, when the assignment ended) instead of not found.
@@ -236,9 +235,11 @@ Add `causeCode` (`window_open` / `insulation_loss` / `unknown`), `evidenceKind` 
 
 Verification: AT-T07-SRC uses three fixtures: suspected open window, inspection record of poor insulation, and no evidence. Each has different wording, evidence, and time. Marking a notification read alone does not resolve the alert.
 
+As built (IR877): the banner of an unresolved alert adds "What to do on site: …". The step goes by the suspected cause, then the type, with a fault last: check the windows and doors (window_open), look for gaps (insulation_loss), clean the filter (maintenance), check the ventilation and the sensor (quality), check the cover and the restriction device (tamper, restriction_bypass), nothing on site (reconciliation_required), and otherwise find the cause and record it in the work report. An inspection record needs nothing. The resolution note says how the alert resolves for this technician: by a remeasurement, below with a reason when they hold alert.resolve, or by asking a user with “Resolve alerts”.
+
 **Source mapping**: SRC-06 BIZ-08, BIZ-11, BIZ-17 → FR-T07 → DD-T07. Source category: original company requirements SRC-06 + design additions. Design addition: possible causes, evidence, and resolution steps. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-T07 / Main display pattern: **UI-DETAIL**. Service boundary: `alerts.list, alerts.get, alerts.acknowledge, alerts.resolve, alerts.evidence, units.get, jobs.get`.
+Scope: FR-T07 / Main display pattern: **UI-DETAIL**. Service boundary: `alerts.list, alerts.acknowledge, alerts.resolve, alerts.evidence, units.get, jobs.get`.
 
 **Initial view and prerequisites**: An assigned unit has an alert or a suspected issue to diagnose. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -260,7 +261,7 @@ Scope: FR-T07 / Main display pattern: **UI-DETAIL**. Service boundary: `alerts.l
 3. Record detection, acknowledgement, and resolution times and actors. For recurrence, create a new alertId linked to the previous event.
 4. Queries to update: `alerts / alert events / customer summary / admin summary / audit`.
 
-**Boundary cases and failures**: Job completion alone does not set `resolved`. Automatic resolution through remeasurement applies only to Alerts with a policy; others require manual resolution with a reason (IR66). A URL job whose window has ended (a history snapshot) shows as no job (IR314). Connection loss alone does not prove theft. Treat removal as its own distinct event.
+**Boundary cases and failures**: Job completion alone does not set `resolved`. Automatic resolution through remeasurement applies only to Alerts with a policy; others require manual resolution with a reason (IR66). A URL job whose window has ended (a history snapshot) shows as no job (IR314). Connection loss alone does not prove theft. Treat removal as its own distinct event. As built, a resolution takes at most 20 evidence records ("Pick at most 20 evidence records", refused before any call), and choosing another alert clears the evidence picked for the previous one.
 
 **Verification**: Check the traceability entries under AT-T07 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -268,7 +269,7 @@ Scope: FR-T07 / Main display pattern: **UI-DETAIL**. Service boundary: `alerts.l
 
 **Source mapping**: SRC-06 BIZ-12 → FR-T08 → DD-T08. Source category: original company requirements SRC-06 + design additions. Design addition: start, submit, and resubmit states. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-T08 / Main display pattern: **UI-DETAIL**. Service boundary: `jobs.get, jobs.submit, reports.get, jobs.start, jobs.resumeRework, units.get, jobs.acknowledgeAssignment`.
+Scope: FR-T08 / Main display pattern: **UI-DETAIL**. Service boundary: `jobs.get, jobs.submit, reports.get, jobs.resumeRework, units.get, jobs.acknowledgeAssignment`.
 
 **Initial view and prerequisites**: The user is assigned an `assigned` job within the valid period. Periodic, reactive, and preventive maintenance use the same work-state model. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -327,7 +328,7 @@ Scope: FR-T09 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, 
 
 **Source mapping**: SRC-06 BIZ-13 → FR-T10 → DD-T10. Source category: design additions supporting company goals. Design addition: technician control permissions and test-run steps. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-T10 / Main display pattern: **UI-DETAIL** and **UI-FORM**. Service boundary: `commands.create, commands.get, diagnosticRuns.create, diagnosticRuns.get, units.get, jobs.get, diagnosticRuns.list, commands.list`.
+Scope: FR-T10 / Main display pattern: **UI-DETAIL** and **UI-FORM**. Service boundary: `commands.create, diagnosticRuns.create, units.get, jobs.get, diagnosticRuns.list, commands.list`.
 
 **Initial view and prerequisites**: Within the assignment period, with `control.diagnose` capability, the device online, and no contract restriction exceeded. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -343,11 +344,11 @@ Scope: FR-T10 / Main display pattern: **UI-DETAIL** and **UI-FORM**. Service bou
 
 1. Check current state and assigned job. Set diagnostic action, test-run duration, and reason. Confirm the details, then view Command acknowledgements and history.
 2. Do not start a new action during firmware (FW) updates or while a Command is unfinished. Ending a test run also requires an end-Command acknowledgement. A browser timer ending alone does not prove the device has stopped.
-3. Use `commands.create` for normal diagnosis. Use `diagnosticRuns.create` for test runs and save jobId, reason, durationMinutes, and endAction in shared memory. Link start and end Commands by `runId`. Show scheduled end time separately from actual end acknowledgement. Record failed endings as warnings.
+3. Use `commands.create` for normal diagnosis. Use `diagnosticRuns.create` for test runs and save jobId, reason, durationMinutes, and endAction (in shared memory in the Phase 1A demo; in API mode the Core API stores the DiagnosticRun). Link start and end Commands by `diagnosticRunId`. Show scheduled end time separately from actual end acknowledgement. Record failed endings as warnings.
    - As built (IR351, Figma 425:474): a run in `end_failed` offers “Retry end command”, which sends the end action again with `commands.create` as a command of the job; the run stays `end_failed`. Outside the work window, and for `end_blocked`, the card reads “Retry not available — no authorization”. After a completed run, the start button reads “Start new test run”.
 4. Queries to update: `commands / unit detail / audit`. The job's command history is `commands.list` (IR216); the page is opened for one job (`jobId`, from the unit or job page — in progress first, else assigned).
 
-**Boundary cases and failures**: Reject attempts to bypass temperature limits, actions outside the assignment period, test runs of 16 minutes or more, and missing reasons. Follow IR46 for actions under restrictions and IR47 for rejection based on connection/power signals. Do not show stopped without an end acknowledgement. The actions follow the unit's capabilities, ventilation included on a model with a fresh-air function. A URL job whose window has ended answers jobs.get with its history snapshot; it is not the technician's job to control and shows as not found (IR314).
+**Boundary cases and failures**: Reject attempts to bypass temperature limits, actions outside the assignment period, test runs of 16 minutes or more, and missing reasons. Follow IR46 for actions under restrictions and IR47 for rejection based on connection/power signals. Do not show stopped without an end acknowledgement. The actions follow the unit's capabilities, ventilation included on a model with a fresh-air function. A URL job whose window has ended answers jobs.get with its history snapshot; it is not the technician's job to control and shows as not found (IR314). As built, the retry of a failed run end retries the run it is shown for.
 
 **Verification**: Check the traceability entries under AT-T10 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -376,7 +377,7 @@ Scope: FR-T11 / Main display pattern: **UI-LIST**, **UI-FORM**, **UI-DETAIL**. S
 3. Save `Device`, `CalibrationRecord`, and `DeviceOperation`. Update `firmwareVersion` only when the result is `succeeded`. Follow IR67 for queued → running and the connecting display (the equipment scheduler starts and times out operations; the screen refreshes while one is open, IR217). Reject control requests during updates as CONFLICT. Follow D05 for mutual exclusion.
 4. Queries to update: `devices / operations / calibrations / capabilities / audit`.
 
-**Boundary cases and failures**: Reject duplicate serial numbers, unauthorized rebinding to another unit, and unit mismatches, without changing the register. Do not start firmware updates offline. Show `failed` on update failure and keep the old version. As built (IR366): a technician rebinds a bound device only when the unit it leaves also has an assignment of theirs whose work window contains now; otherwise NOT_FOUND, and the device stays.
+**Boundary cases and failures**: Reject duplicate serial numbers, unauthorized rebinding to another unit, and unit mismatches, without changing the register. Do not start firmware updates offline. Show `failed` on update failure and keep the old version. As built (IR366): a technician rebinds a bound device only when the unit it leaves also has an assignment of theirs whose work window contains now; otherwise NOT_FOUND, and the device stays. As built, a device form checks the page it was read with: after a refresh, Register sends only a unit and job still listed, a firmware version no longer offered is not sent, and Calibrate or Update firmware of a device whose assignment ended closes and says the device is read-only.
 
 **Verification**: Check the traceability entries under AT-T11 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -401,6 +402,7 @@ Scope: FR-T12 / Main display pattern: **UI-DETAIL** and **UI-TIMELINE**. Service
 **Steps**
 
 1. Simulate communication loss, power loss, and removal detection separately. Check notifications, enter response notes, and record recovery or confirmation.
+   - As built the device screen has no demo controls: /demo triggers a communication loss of a bound device and its restoration (`demo.trigger`, SR20); The IoT bridge sends the same communication loss and restoration for a live node that falls silent and returns. `demo.trigger` also takes power_lost and tamper, but no screen sends them (the Go integration tests do).
 2. Manage connection and tamper states separately. Identify power loss only when the demo provides a dedicated power signal. Missing heartbeats alone do not prove power loss.
 3. Save detection time, observation evidence, response details, and recovery time as separate events. Acknowledging a notification does not change the device's physical state.
 4. Queries to update: `devices / alerts / device events / notifications / audit`.
@@ -415,7 +417,7 @@ Scope: FR-T12 / Main display pattern: **UI-DETAIL** and **UI-TIMELINE**. Service
 
 Scope: FR-T13 / Main display pattern: **UI-FORM**. Service boundary: `units.resolveQr, jobs.checkIn, jobs.get, units.get, units.list, jobs.list`.
 
-**Initial view and prerequisites**: “▣ Scan QR” in the Overview header or Check in from Start job. Camera access is simulated in the demo; the label code can be typed.
+**Initial view and prerequisites**: “▣ Scan QR” in the app header (as built on every technician page, `AppShell`) or Check in from Start job. Camera access is simulated in the demo; the label code can be typed.
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
@@ -454,7 +456,7 @@ Scope: FR-T14 / Main display pattern: **UI-FORM**. Service boundary: `jobs.saveD
 
 **Steps**
 
-1. + Add part opens a centered modal; “Add to report” appends a Part and autosaves via `jobs.saveDraft`. Remove deletes the line from the draft.
+1. + Add part opens a centered modal; “Add” appends a Part and autosaves via `jobs.saveDraft`. Remove deletes the line from the draft.
 2. + Refrigerant adds a RefrigerantRecord with the computed net amount.
 3. Time on site shows arrivedAt (check-in), startedAt, pauses, finishedAt (on submit), and on-site minutes; Pause work calls `jobs.pauseWork`.
 4. Queries to update: `reports / jobs`.
@@ -480,7 +482,7 @@ Scope: FR-T15 / Main display pattern: **UI-FORM**. Service boundary: `reports.si
 **Steps**
 
 1. The centered modal summarises job, work, parts, and on-site time; Clear resets the pad.
-2. Confirm calls `reports.signOff` with reportId and reportVersion; the workspace badge shows “Signed hh:mm”.
+2. Confirm calls `reports.signOff` with reportId and reportVersion; the workspace shows “Signed · {name} · {time}”.
 3. Submitting without a sign-off shows a warning dialog; continuing requires an absence reason.
 
 **Boundary cases and failures**: A newer draft version clears the sign-off (CONFLICT if the version changed while signing).
@@ -491,7 +493,7 @@ Scope: FR-T15 / Main display pattern: **UI-FORM**. Service boundary: `reports.si
 
 **Source mapping**: Added design details → FR-T16 → DD-T16 (DEC-106, 2026-11-12), supporting SRC-06 BIZ-07, BIZ-12, BIZ-20.
 
-Scope: FR-T16 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, jobs.saveDraft, jobs.submit, devices.register, devices.bind`.
+Scope: FR-T16 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, jobs.saveDraft, jobs.submit`.
 
 **Initial view and prerequisites**: `/technician/jobs/:id` of a job with `type=installation`, started (FR-T13). The unit is `planned`.
 
@@ -518,4 +520,4 @@ Scope: FR-T16 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, 
 
 Additional contracts: every IR in the [Re-review Correction Contracts](review-resolution-contracts.md) applies, the newest included. They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
-Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.
+Apply IR34 to job-list and jobs.list sorting. As built the technician overview (DD-T01) offers three sorts, each in one direction: `severity` (most severe first, the default when the URL has no sort), `dueAt` (soonest first) and `status` (earliest stage first). Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot.

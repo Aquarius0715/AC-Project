@@ -18,16 +18,22 @@ import (
 
 var errInjected = errors.New("injected database failure")
 
-// failing is a transaction whose statements containing match fail, as a database error would; the rest run normally.
+// failing injects an error into matching statements while the rest run against PostgreSQL.
 type failing struct {
 	pgx.Tx
 
-	match string
+	match    string
+	scan     bool
+	skipExec int
 }
 
-func (f failing) Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
+func (f *failing) Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
 	if strings.Contains(sql, f.match) {
-		return pgconn.CommandTag{}, errInjected
+		if f.skipExec == 0 {
+			return pgconn.CommandTag{}, errInjected
+		}
+
+		f.skipExec--
 	}
 
 	out, err := f.Tx.Exec(ctx, sql, args...)
@@ -35,12 +41,50 @@ func (f failing) Exec(ctx context.Context, sql string, args ...any) (pgconn.Comm
 	return out, apperr.Wrap(err, "exec (Exec)")
 }
 
+//nolint:ireturn // the pgx.Tx interface requires this return type for transaction wrappers
+func (f *failing) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
+	matches := strings.Contains(sql, f.match)
+	if matches && !f.scan {
+		return nil, errInjected
+	}
+
+	rows, err := f.Tx.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, apperr.Wrap(err, "query (failing.Query)")
+	}
+
+	if matches {
+		return failedScanRows{Rows: rows}, nil
+	}
+
+	return rows, nil
+}
+
+//nolint:ireturn // the pgx.Tx interface requires this return type for transaction wrappers
+func (f *failing) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
+	if strings.Contains(sql, f.match) {
+		return failedScanRow{}
+	}
+
+	return f.Tx.QueryRow(ctx, sql, args...)
+}
+
+type failedScanRow struct{}
+
+func (failedScanRow) Scan(...any) error { return errInjected }
+
+type failedScanRows struct{ pgx.Rows }
+
+func (failedScanRows) Scan(...any) error { return errInjected }
+
 // injectAt returns a server whose operations fail at the first statement containing match.
 func injectAt(t *testing.T, match string) *apiserver.Server {
 	t.Helper()
 
 	return serverCfg(t, func(c *apiserver.Config) {
-		c.WrapTx = func(tx pgx.Tx) pgx.Tx { return failing{Tx: tx, match: match} }
+		c.WrapTx = func(tx pgx.Tx) pgx.Tx {
+			return &failing{Tx: tx, match: match, scan: false, skipExec: 0}
+		}
 	})
 }
 

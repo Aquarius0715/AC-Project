@@ -10,7 +10,11 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
-const fieldEndsNextDay = "endsNextDay"
+const (
+	fieldEndsNextDay = "endsNextDay"
+	fieldEndAction   = "endAction"
+	fieldOnlyIf      = "onlyIf"
+)
 
 func scheduleRule(u string, extra map[string]string) string {
 	bodyFields := map[string]string{
@@ -25,7 +29,7 @@ func scheduleRule(u string, extra map[string]string) string {
 		fieldEndLocal:    `"18:00"`,
 		fieldEndsNextDay: jsonFalse,
 		fieldStartAction: actionPowerOn,
-		"endAction":      actionPowerOff,
+		fieldEndAction:   actionPowerOff,
 	}
 
 	for key, value := range extra {
@@ -74,7 +78,7 @@ func TestAutomationSchedules(t *testing.T) {
 		"same start and end":   {fieldEndLocal: `"08:00"`},
 		"overnight not marked": {fieldStartLocal: `"22:00"`, fieldEndLocal: `"06:00"`},
 		"over 24 hours":        {fieldEndsNextDay: jsonTrue},
-		"no end action":        {"endAction": ""},
+		"no end action":        {fieldEndAction: ""},
 		"bad time":             {fieldStartLocal: `"8:00"`},
 		caseBadZone:            {fieldTimezone: `"Moon/Base"`},
 		casePriorityOver100:    {fieldPriority: "101"},

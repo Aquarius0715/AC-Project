@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND
-version: 0.49.0
+version: 0.50.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -14,14 +14,14 @@ scope: production-target-logical
 This document designs the production backend that will replace the Phase 1A mock adapter (NFR-06, [common design §4 and §8](common.md#4-frontend-data-service-boundaries)). It started as a logical, cloud-agnostic design (IR116, DEC-67); §3a maps every component to **AWS**, the hosting provider chosen on 2026-10-07 (IR117, DEC-68). Everything here is `PROPOSED` unless marked `OPEN`.
 
 - Phase 1A scope is unchanged: the clickable demo still runs on the shared mock and makes no real payment, notification, IoT, or trading connection (FR-X05).
-- The screens, operations, permissions, and state machines already defined in these documents are the contract the backend implements. The [operation catalog](operation-catalog.csv) (213 operations), [service contracts](service-contracts.ts), [write version catalog](write-version-catalog.csv), and the state transitions in [common design §5](common.md#5-state-transitions-and-consistency) are the source of truth; this document must not redefine them.
+- The screens, operations, permissions, and state machines already defined in these documents are the contract the backend implements. The [operation catalog](operation-catalog.csv) (236 operations), [service contracts](service-contracts.ts), [write version catalog](write-version-catalog.csv), and the state transitions in [common design §5](common.md#5-state-transitions-and-consistency) are the source of truth; this document must not redefine them.
 - Network zones, ports, and traffic rules are in the [network architecture](network-architecture.md).
 - Diagrams: Figma file VOeKPrid46kOf24ktEfe8r, page “System Architecture”, boards 03 (backend), 04 (network), 06 (Go implementation and database), 07 (containers) and 08 (business-domain services and cross-domain contracts as built, IR197).
 
 Decisions applied (DEC-67, DEC-68, DEC-69):
 
-1. The frontend stack is **Next.js (App Router)**, as implemented in the four apps `service/web/{customer,partner,technician,admin}` with the shared package `service/web/shared` (IR178). In production it also acts as the **BFF** (backend for frontend): it serves the four role apps, holds the user session, and relays operations to the Core API. The browser never calls the Core API directly.
-2. The backend is a **modular monolith** (one Core API deployable with strict module boundaries) plus **separately deployed workers** for IoT, scheduling, notifications, and exports, so that device traffic and background work scale and fail independently of user requests.
+1. The frontend stack is **Next.js (App Router)**, as implemented in the four apps `service/web/{customer,partner,technician,admin}` with the shared package `service/web/shared` (IR178), and the portal `service/web/portal` that lists the service addresses (IR791). In production it also acts as the **BFF** (backend for frontend): it serves the four role apps, holds the user session, and relays operations to the Core API. The browser never calls the Core API directly.
+2. The backend is a **modular monolith** (one Core API deployable with strict module boundaries; as built split into a gateway and five business-domain services, IR180, §3) plus **separately deployed workers** for IoT, scheduling, notifications, and exports, so that device traffic and background work scale and fail independently of user requests.
 3. Hosting is **AWS** (DEC-68). Primary region Asia Pacific (Malaysia) `ap-southeast-5`; disaster recovery and any service not yet offered in ap-southeast-5 run in Asia Pacific (Singapore) `ap-southeast-1`. Check service availability per region at setup; keep personal data in ap-southeast-5 whenever the service exists there (privacy, §12).
 4. Payments use **Stripe** (hosted Stripe Checkout, MYR, cards and FPX online banking as enabled on the account; DEC-68).
 5. The HQ admin app is reachable **only from the company network** (office egress addresses and the company VPN); see §6 and the [network architecture §3](network-architecture.md#3-public-endpoints).
@@ -49,7 +49,7 @@ Decisions applied (DEC-67, DEC-68, DEC-69):
 |---|---|---|---|---|
 | Edge (CDN, WAF, DDoS protection) | TLS termination for public names, static asset caching, request filtering, rate limits | Managed edge service | Provider | None |
 | Web / BFF (Next.js) | Serves the four role apps and shared routes; OIDC login flow; server-side session; relays `/bff/ops/<operation>` (the browser's operation call with its JSON input) to the operation's REST route of the Core API with the user context (IR223); pushes change notifications to browsers (SSE) | Stateless containers behind the load balancer | Requests | Session in cache |
-| Core API (modular monolith) | Executes the 234 operations: validation, authorization, state transitions, versions, audit, outbox events | Stateless containers in the app zone | Requests, CPU | Database |
+| Core API (modular monolith) | Executes the 236 operations: validation, authorization, state transitions, versions, audit, outbox events | Stateless containers in the app zone | Requests, CPU | Database |
 | IoT gateway service | Device registry and credentials, MQTT bridge, command dispatch and acknowledgement matching, heartbeat and connection state, firmware operations | Containers next to the MQTT broker | Connected devices, messages | Database, broker |
 | Telemetry processor | Validates and stores measurements (quality valid / missing / stale / suspect), evaluates alert policies, feeds automation conditions; a separate rollup role writes the 15-minute and hourly aggregates | Stream consumers | Messages per second | Time-series store |
 | Automation engine | Evaluates schedules and event conditions; arbitrates capability → restriction → HQ policy → customer rule (DEC-09); creates Commands through the same Command policy | Workers | Rules due | Database |
@@ -120,7 +120,7 @@ Each module owns its tables and is reached by other modules only through its pub
 
 The last column names the design's events. The events the domain services exchange as built are listed in §8 (IR552); the modules also write other event types to the outbox for the planned consumers.
 
-The [operation persistence map](operation-persistence-map.csv) lists, for each of the 234 operations, the owning module, the tables it reads and writes in its own schema, the other modules it calls through their interfaces, and the write side effects (audit row, idempotency record, outbox event); it is generated by `docs/tools/gen_operation_persistence_map.py` from the operation catalog and `db/schema.sql`.
+The [operation persistence map](operation-persistence-map.csv) lists, for each of the 236 operations, the owning module, the tables it reads and writes in its own schema, the other modules it calls through their interfaces, and the write side effects (audit row, idempotency record, outbox event); it is generated by `docs/tools/gen_operation_persistence_map.py` from the operation catalog and `db/schema.sql`. It is the design's map by operation prefix, not read from the handlers' SQL: as built a handler also reads the tables its scope checks, joins and reference copies need (for example `assets.units` for a unit's customer, or the other job tables of a maintenance write), and the integration tests, not this map, check what each operation reads and writes.
 
 Cross-module rules that the modules must keep:
 
@@ -206,7 +206,7 @@ Modelling rules:
   - billing (restrictions) → equipment: `UnitRestrictionApplied`, `UnitRestrictionCleared`, `RecoveryCasesChanged`, `ReconciliationRequired`, `ReconciliationResolved`, `RestrictionCommandRequested`, `RestrictionCommandsCancelled`;
   - equipment → billing (restrictions): `UnitRestrictionObserved`, `CommandAcknowledged`, `CommandsEnded`;
   - any domain → identity: `NotificationRequested` (the notification store) and `AuditRecorded`; maintenance → identity: `QualificationGranted`; billing → maintenance: `JobNoteRequested`;
-  - maintenance → equipment: `OfferAccessChanged`, `AssignmentAccessChanged` (row triggers), `FilterCleaningDue`, `FilterCleaningCleared`; identity → equipment: `ConsentRevoked`; equipment (assets) → equipment (monitoring) and maintenance: `CustomerDeleted` (IR739: the deleted customer's alert policies, default rule switches and filter care settings);
+  - maintenance → equipment: `OfferAccessChanged`, `AssignmentAccessChanged` (row triggers), `FilterCleaningDue`, `FilterCleaningCleared`, `UnitInstalled` (an accepted installation report installs the planned unit, DEC-106); identity → equipment: `ConsentRevoked`; equipment (assets) → equipment (monitoring) and maintenance: `CustomerDeleted` (IR739: the deleted customer's alert policies, default rule switches and filter care settings);
   - identity's own `identity-accounts` consumer: `AccountRequested`, `AccountEnabled`, `SessionsRevoked`.
 
   The other event types in the outbox (for example `JobAssigned` or `InvoiceCreated`) record what happened for the planned SNS consumers; nothing consumes them yet. The flows of the table that have no such event, such as TelemetryReceived, CommandSettled and AlertOpened, have no event as built: the IoT bridge posts the readings, the acknowledgements and the facts to evaluate to the API over HTTP (`demo.trigger`), which stores them and evaluates the alert policies itself (IR529).
@@ -334,7 +334,7 @@ Items of the table above that are not scheduled yet:
 
 - Everything runs in Docker (IR119): the same images run in Compose locally and in CI and on ECS Fargate in staging and production; infrastructure as code for every environment; immutable image digests promoted from dev to staging to production.
 - CI runs type checks, lint, unit, contract, and end-to-end tests (NFR-07), database migration checks, and security scans; production deploys use rolling or blue-green releases with automatic rollback on health checks.
-  - As built (IR550): GitHub Actions runs the lint and type checks, the unit and integration suites (the migration check is one of the Go tests: `schema.sql` equals the first migration), the document validators and the end-to-end suite. The security scans do not run in CI yet.
+  - As built (IR550): GitHub Actions runs the lint and type checks, the unit and integration suites (the migration check is one of the Go tests, `TestMigrationsMatchSchema`: `schema.sql` equals the migrations applied in order, IR785) and the document validators on every push and pull request, and the end-to-end suite every night (IR632). The security scans do not run in CI yet.
   - As built (IR364): the dependency scans run by hand: `make vuln` for the Go modules (govulncheck at a pinned version, on the module's own toolchain so that it checks the standard library the images build with, IR503) and `npm audit` for the web workspace (`--omit=dev` for what ships). Dependabot proposes the updates (IR550). Each development round also reviews one class of vulnerability in the code.
 - Database migrations are backward compatible for one release (expand, migrate, contract).
 

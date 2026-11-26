@@ -67,6 +67,8 @@ Real device control, external notifications, payments, and API authentication be
 
 The table above is an index. The following sections explain entry conditions, steps, results, and acceptance criteria for each requirement.
 
+As built (2026-11-24): the acceptance cases below are written against the Phase 1A demo (`demoSeed`, /demo events, `acceptancePatches`). In API mode the device answers come from the IoT simulator or a live device through the bridge, /demo offers only a device's connection loss and restoration, the session expiry and the Core API scenario, and the data is reset with `make resetdb`; the Go integration and end-to-end tests check the same behaviour against the Core API (verification plan). Where a case's expected code differs from the Core API, the case says so.
+
 Numbers ①②… in acceptance cells identify observations within that cell. Match independent Given conditions to Then results by meaning; do not confuse multiple assertions with case IDs. D01's cause-based priority table determines one failure code.
 
 Use the fixed fixtures named in the [verification plan](../04-agentic-sdlc/verification.md).
@@ -86,8 +88,8 @@ Detailed thresholds and operating rules absent from the company original are pha
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-C01-N | customer-a; property-home-a contains unit-online-rto (power ON, room 28.0°C, humidity 60%, last observation 00:59:30Z) and unit-non-rto (power OFF). Both connection=online; power observations/latest power Measurements meet fixture.powerClassification fresh conditions. One open alert. When: Open `/customer?propertyId=property-home-a&period=today`, follow running card to list, then Back | ① “Running 1 / Stopped 1 / Unknown 0,” one alert. With no unit selected, temperature says “Select a unit,” without an average ② Power card asOf=00:59:30Z ③ Destination `/customer/properties?propertyId=property-home-a&powerState=on` (IR50), without period; Back restores original period too ④ Zero Repository writes |
-| AT-C01-E | ① simulator=false; latest sensor-online-power value=null, quality=missing ② Open `/customer?unitId=unit-other-customer` ③ units.list UNAVAILABLE | ① “Running 0 / Stopped 1 / Unknown 1,” no addition to normal count ② NOT_FOUND/unavailable target; return neither other-customer data nor successful zero totals ③ KPI error/retry; do not show zero or previous values as normal |
+| AT-C01-N | customer-a; property-home-a contains unit-online-rto (power ON, room 28.0°C, humidity 60%, last observation 00:59:30Z) and unit-non-rto (power OFF). Both connection=online; power observations/latest power Measurements meet fixture.powerClassification fresh conditions. One open alert. When: Open `/customer?propertyId=property-home-a&period=today`, follow running card to list, then Back | ① The Running, Stopped and Unknown tiles read 1, 1 and 0, one alert. As built there is no temperature card: the unit table gives each unit's latest temperature (“Latest value per unit — no averaged temperature across rooms”), without an average ② Power card asOf=00:59:30Z ③ Destination `/customer/properties?propertyId=property-home-a&powerState=on` (IR50), without period; Back restores original period too ④ Zero Repository writes |
+| AT-C01-E | ① simulator=false; latest sensor-online-power value=null, quality=missing ② Open `/customer?unitId=unit-other-customer` ③ units.list UNAVAILABLE | ① The Running, Stopped and Unknown tiles read 0, 1 and 1, no addition to normal count ② NOT_FOUND/unavailable target; return neither other-customer data nor successful zero totals ③ KPI error/retry; do not show zero or previous values as normal |
 | AT-C01-B | ① room-1=28.0°C, room-2=24.0°C, no unit selected ② Select unitId for room-1's unit ③ Change period=7d | ① No representative temperature (26.0°C absent) ② Room 28.0°C and observation time ③ Energy integrated over seven-day [from,to); current power keeps latest observation time |
 
 Design: [DD-C01](../02-design/client.md#dd-c01-details). Assess parent AT-C01 using all N/E/B and applicable SRC/R01 cases in traceability.
@@ -106,7 +108,7 @@ Design: [DD-C01](../02-design/client.md#dd-c01-details). Assess parent AT-C01 us
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
 | AT-C02-N | customer-a; seed property-home-a/property-office-a. When: select Home A → room “Bedroom” → rename “Home A” to “Home A — Tan family” | ① Tree shows two properties; Bedroom lists Bedroom AC and Bedroom AC #2 ② One `locations.rename` call; Property version+1, child unit IDs unchanged ③ No add/move/delete controls; unassigned units show “placed by HQ” guidance ④ Breadcrumb shows the new name |
-| AT-C02-E | ① Empty/121-character name ② Rename room “Bedroom” to sibling name “Living room” ③ Display version=1, another action makes version=2, then save ④ Direct properties.save / spaces.save / spaces.archive with a client session | ① VALIDATION, fieldErrors.name, zero saves ② VALIDATION (duplicate among siblings), input kept ③ CONFLICT, current name shown, input kept ④ FORBIDDEN, zero changes |
+| AT-C02-E | ① Empty/121-character name ② Rename room “Bedroom” to sibling name “Living room” ③ Display version=1, another action makes version=2, then save ④ Direct properties.save / spaces.save / spaces.archive with a client session | ① VALIDATION, fieldErrors.name, zero saves ② CONFLICT `error.duplicateSiblingName` (IR208), input kept ③ CONFLICT, current name shown, input kept ④ FORBIDDEN, zero changes |
 | AT-C02-B | ① Rename a unit to a 120-character name ② Rename an unassigned unit ③ Open a space archived by HQ by direct URL | ① Success ② Success; it stays unassigned ③ not-found |
 
 Design: [DD-C02](../02-design/client.md#dd-c02-details). Assess parent AT-C02 using all N/E/B and applicable SRC/R01 cases in traceability.
@@ -157,7 +159,7 @@ Design: [DD-C04](../02-design/client.md#dd-c04-details). Assess parent AT-C04 us
 
 - **Entry conditions**: Select automation targets/condition types. Location conditions require purpose-specific consent.
 - **Main flow**: Choose occupancy, arrival/departure, routine, or weather condition → check consent → save action → trigger test events to check matching/nonmatching conditions.
-- **Business rule BR-C05**: Manage location consent only for location_automation; do not record consent merely to use the app (IR102). Phase 1A uses predefined location events only. Routines are demo estimates; collect no real personal behavior history. Missing condition data never counts as a match.
+- **Business rule BR-C05**: Manage location consent only for location_automation; do not record consent merely to use the app (IR102). Phase 1A uses predefined location events only; as built (DEC-109, IR826) API mode sends the device's own position while the automations page is open, and no position is stored. Routines are demo estimates; collect no real personal behavior history. Missing condition data never counts as a match.
 - **Resulting business state**: Withdrawal disables rules with enabled=false, disabledReason=consent_revoked. Regranting does not automatically enable them (IR53). Do not label existing Commands cancelled. Authorized manual actions remain available.
 - **Boundaries/prohibitions**: Cannot enable location conditions without consent. Arrival after withdrawal creates no Command. Missing weather data skips with a reason.
 
@@ -184,7 +186,7 @@ Design: [DD-C05](../02-design/client.md#dd-c05-details). Assess parent AT-C05 us
 |---|---|---|
 | AT-C06-N | `acceptancePatches["AT-C06-N"]` (IR92: unit-online-rto actual 80kWh, demo_fixed baseline 100kWh, price 0.5MYR/kWh, custom [2026-09-14T00:00Z, 01:00Z)). When: Display → expand baseline | ① 80.0kWh, estimated 40.00MYR, tariffVersion ② Savings 20.0kWh, 20.0%, 10.00MYR ③ coverage=100% ④ URL has `from`, `to`, `unitIds` |
 | AT-C06-E | Query separate cases: .1 Same as AT-C06-N (baseline 100/actual 80) .2 `acceptancePatches["AT-C06-E.2"]` (baseline 0) .3 `["AT-C06-E.3"]` (unit-online-rto/unit-non-rto, baseline 100/actual 120) .4 `["AT-C06-E.4"]` (five missing slots 00:10–00:15Z) | 100/80 gives savings 10MYR. Baseline 0 gives percentage null (“Cannot calculate”); actual 120 gives savingPercentage=-20, “Increase 20.0%” (IR80). Missing slots lower coverage, but valid values remain visible; do not reject the whole screen. |
-| AT-C06-B | ① 366 days ② 366 days+1ms ③ Same unit set/calculation boundary ④ Different unit set | ① Success ② VALIDATION ③ Show difference ④ Difference null, reason “Calculation boundary mismatch” |
+| AT-C06-B | ① 366 days ② 366 days+1ms ③ Same unit set/calculation boundary ④ Different unit set | ① Success ② VALIDATION ③ Show difference ④ Difference null; as built the screen says “Baseline not comparable — unit set, boundary, period length or coverage differ, so no difference is shown” |
 
 Design: [DD-C06](../02-design/client.md#dd-c06-details). Assess parent AT-C06 using all N/E/B and applicable SRC/R01 cases in traceability.
 
@@ -209,7 +211,7 @@ Alongside CO₂, dust, and humidity, show whether allergen data is available and
 |---|---|---|
 | AT-C07-N | room-1: CO₂=1000ppm, PM2.5=12µg/m³, temperature 28°C, humidity 60%. When: Display → Log ventilation (window opened, 15 min) → save | ① Four separate series with units ② “Ventilation recommended” (co2≥1000ppm, IR99) ③ One VentilationLog with co2AtLog=1000 ppm, zero Commands ④ CO₂ remains 1000ppm; no assumed reduction |
 | AT-C07-E | Display unit-online-rto CO₂=null, PM2.5=12µg/m³ / Log ventilation with duration 0 or 241 min | CO₂ not measured; PM2.5 12µg/m³; “No current advice” (IR99). Duration VALIDATION, input kept, zero logs. |
-| AT-C07-B | unit-online-rto: ① humidity=0 ② humidity=null ③ View unit-non-rto without a fresh-air function ④ CO₂=999ppm, PM2.5=12 ⑤ CO₂=1000ppm ⑥ PM2.5=35µg/m³ ⑦ Both CO₂/PM2.5 null | ① “0%” ② “Not measured” ③ Manual ventilation guidance; Log ventilation still available ④ “No current advice” ⑤ “Ventilation recommended” ⑥ “Filter cleaning/inspection recommended” ⑦ “Not enough data for advice” (IR99) |
+| AT-C07-B | unit-online-rto: ① humidity=0 ② humidity=null ③ View unit-non-rto without a fresh-air function ④ CO₂=999ppm, PM2.5=12 ⑤ CO₂=1000ppm ⑥ PM2.5=35µg/m³ ⑦ Both CO₂/PM2.5 null | ① “0%” ② “Not measured” ③ Manual ventilation guidance; Log ventilation still available ④ “No current advice” ⑤ “Ventilation recommended” ⑥ “Filter cleaning and inspection recommended” ⑦ “Not enough data for advice” (IR99) |
 
 Design: [DD-C07](../02-design/client.md#dd-c07-details). Assess parent AT-C07 using all N/E/B and applicable SRC/R01 cases in traceability.
 
@@ -266,12 +268,12 @@ Design: [DD-C09](../02-design/client.md#dd-c09-details). Assess parent AT-C09 us
 - **Entry conditions**: Zero or more own-organization contracts. Viewing requires no payment action.
 - **Main flow**: Select contract → check units/period/plan → view amount/deadline/receipt state → invoice details.
 - **Business rule BR-C10**: Contract expiry does not mean unit unavailability. Invoice overdue status depends on due date and unpaid balance. Processing is not paid.
-- **Resulting business state**: Read-only. Only customers with zero contracts see “No contract / General maintenance” with a monitoring link. Show type/period/invoices for general/energy/environment contracts (IR61).
+- **Resulting business state**: Read-only. Only customers with zero contracts see “No contract — general maintenance” with a monitoring link. Show type/period/invoices for general/energy/environment contracts (IR61).
 - **Boundaries/prohibitions**: Customer A cannot retrieve customer B's invoiceId. Paid invoices have no start-payment button.
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-C10-N | contract-rto-a (unit-online-rto, planType=rto), invoice-overdue-a 120.00MYR, dueAt=2026-09-10, unpaid. When: Select contract → invoice details; also open as customer-b with zero contracts | ① Contract/unit link ② 120.00 MYR, deadline, unpaid/overdue ③ Navigate to invoice details ④ customer-b sees “No contract / General maintenance” and monitoring link |
+| AT-C10-N | contract-rto-a (unit-online-rto, planType=rto), invoice-overdue-a 120.00MYR, dueAt=2026-09-10, unpaid. When: Select contract → invoice details; also open as customer-b with zero contracts | ① Contract/unit link ② 120.00 MYR, deadline, unpaid/overdue ③ Navigate to invoice details ④ customer-b sees “No contract — general maintenance” and monitoring link |
 | AT-C10-E | ① customer-a opens cust-b invoice-general-b from `acceptancePatches["AT-C10-E.1"]` ② Open invoice-overdue-a after hq-operator records full payment using payments.recordManual | ① NOT_FOUND ② No start-payment button |
 | AT-C10-B | invoice-overdue-a: ① Just after reset set clock to dueAt (2026-09-10T00:00Z, IR36) ② dueAt+1ms ③ customer-a payments.simulate(initiate→processing) ④ After recordManual ⑤ unit-online-rto after patching contract-rto-a.endAt to 2026-09-13T00:00Z | ① Not overdue ② Overdue ③ Processing, not paid ④ paid ⑤ Monitoring/control available |
 
@@ -316,7 +318,7 @@ Design: [DD-C11](../02-design/client.md#dd-c11-details). Assess parent AT-C11 us
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
 | AT-C12-N | Scheduled Restriction created by hq-restriction-manager using restrictions.schedule(contract-rto-a, causeInvoiceIds=[invoice-overdue-a], unitIds=[unit-offline-rto,unit-online-rto], policy=power_off, executeAfter=2026-09-15T01:00Z). When: Display → send inquiry | ① Notice/reason/two units/executeAfter ② Release condition: all cause invoices paid ③ Inquiry received, zero external sends ④ Restriction unchanged |
-| AT-C12-E | ① After AT-C11-N payment confirmation makes restriction-limited-a release_requested, demo.trigger(device communication_lost) on unit-limited ② customer-a directly calls restrictions.override | ① release_requested; under 30 seconds after remove Command creation, perUnit.releaseState=requested (“Waiting for release response (disconnected)”); at/after 30 seconds, failed (IR102). No released label ② FORBIDDEN, unchanged state |
+| AT-C12-E | ① After AT-C11-N payment confirmation makes restriction-limited-a release_requested, demo.trigger(device communication_lost) on unit-limited ② customer-a directly calls restrictions.override | ① release_requested; under 30 seconds after remove Command creation, perUnit.releaseState=requested (as built “Release sent” with “waiting for the unit to confirm”); at/after 30 seconds, failed (IR102). No released label ② FORBIDDEN, unchanged state |
 | AT-C12-B | Create states through normal actions (IR97 item 3): ① AT-C12-N Restriction scheduled ② Advance to executeAfter, execute → requested ③ Seed restriction-limited-a applied ④ After AT-C11-N confirmation: restriction-limited-a release_requested ⑤ Its remove Command sent→acknowledged → released ⑥ For ②, only unit-online-rto responds | ①–⑤ Distinct labels ⑥ Aggregate requested; per-unit applied/pending |
 
 **Additional acceptance AT-C12-R01 (revisit, conflict, cross-role)**
@@ -364,9 +366,9 @@ Design: [DD-C13](../02-design/client.md#dd-c13-details). Assess parent AT-C13 us
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-C14-N | customer-a owner, Office A › Open office (8 ACs, 1 offline). When: select 4 incl. the offline one → set On, 24 °C, Cool, Fan Auto → review → send | ① Review lists 3 “Will send” and 1 “Skipped (offline)” ② Three Commands, one per AC ③ Each card shows its own Confirmed/Failed |
+| AT-C14-N | customer-a owner, Office A › Open office (8 ACs, 1 offline). When: select 4 incl. the offline one → set On, 24 °C, Cool, Fan Auto → review → send | ① Review lists 3 “Will send” and 1 “Skipped” with “Offline since {time} — not sent” ② Three Commands, one per AC ③ Each card shows its own Confirmed/Failed |
 | AT-C14-E | ① Member session opens Group control ② Select ACs from two rooms ③ One AC fails | ① Not offered; direct sends per AC follow FR-C03 authorization ② VALIDATION before sending ③ Only that card shows Failed with Retry |
-| AT-C14-B | ① Select all online (7) ② Lobby AC under restriction minimum 24 °C with 22 °C requested | ① Seven Commands ② Review shows “Set to 24 °C (restriction)” |
+| AT-C14-B | ① Select all online (7) ② Lobby AC under restriction minimum 24 °C with 22 °C requested | ① Seven Commands ② Review shows “Clamped” with “minimum 24 °C (restriction)” |
 
 Design: [DD-C14](../02-design/client.md#dd-c14-details). Assess parent AT-C14 using all N/E/B cases in traceability.
 
@@ -408,7 +410,7 @@ Design: [DD-C16](../02-design/client.md#dd-c16-details). Assess parent AT-C16 us
 
 - **Company request basis**: SRC-06 BIZ-12 — Maintenance requests and history; Figma-confirmed 07g–07i (2026-10-01).
 - **Entry conditions**: Job of the customer in status completed (HQ or contractor accepted the report).
-- **Main flow**: Completed job banner (also on Overview for 7 days) → Confirm & rate (1–5 ★ required, tags, optional comment) → job closed for the client; or Report a problem (reason, details, photos, preferred visit) → follow-up request “Under HQ review”.
+- **Main flow**: Completed job banner on Maintenance for 7 days (as built not on Overview) → Confirm & rate (1–5 ★ required, tags, optional comment) → job closed for the client; or Report a problem (reason, details, photos, preferred visit) → follow-up request “Under HQ review”.
 - **Business rule BR-C17**: The rating can be changed for 7 days (`jobs.rate`); unconfirmed jobs are auto-confirmed after 7 days without a rating. Ratings ≤ 2 ★ ask what went wrong and offer Report a problem. Ratings are visible to HQ and the service company only, never to other customers, and feed contractor KPIs/SLA (FR-A21, FR-A22). Report a problem creates a requested follow-up job linked by `followUpOfJobId`; HQ classifies it within one business day as rework (free) or a new request (`jobs.classifyFollowUp`).
 - **Resulting business state**: MaintenanceJob.rating and customerConfirmedAt are set; a follow-up job appears in My requests as “Under HQ review” until HQ classifies it in Admin 06-17/06-18 (FR-A06, IR114); afterwards it shows “Rework (free)” or “New request”.
 - **Boundaries/prohibitions**: Jobs not yet completed cannot be rated or reported (CONFLICT). Details outside 10–2000 characters and more than 5 photos are VALIDATION.

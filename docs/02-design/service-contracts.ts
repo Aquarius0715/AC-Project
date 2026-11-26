@@ -139,6 +139,7 @@ export type RuleBase = Entity & {name:string;unitIds:ID[];ownerMembershipId:ID;c
 export type ExtraCondition = {type:'weekday';weekdays:number[]}|{type:'occupancy';occupied:boolean}|{type:'weather';metric:'temperature';operator:Compare;value:number};
 /** IR215: the latest run-log outcome of a rule — a Command, or a skip with its reason. */
 export type AutomationRun = {at:Instant;outcome:'command_created'|'skipped';reason:DecisionReason|null;commandId:ID|null};
+export type StartProposal = {id:ID;automationId:ID;unitId:ID;version:number;weekday:number;from:string;to:string;endLocal:string;occurrences:number;supportDates:string[]};
 export type Automation = RuleBase & {onlyIf:ExtraCondition[];lastRun:AutomationRun|null} & ({kind:'schedule';weekdays:number[];startLocal:string;endLocal:string;endsNextDay:boolean;startAction:UnitAction;endAction:UnitAction}|{kind:'event';condition:ClientCondition;action:UnitAction});
 /** IR108: alert policies belong to one customer; units carry them (ACUnit.alertPolicyIds) and alert Policy.unitIds is the derived attachment list. Air-quality limits are alert policies (FR-A12 merged into FR-A05). */
 export type ActiveWindow = {weekdays:number[];startLocal:string;endLocal:string};
@@ -283,6 +284,8 @@ export type OperationContracts = {
   'auth.previewPasswordReset': {input:{demoEmail:string};result:ResetPreview;mode:'read'};
   'automations.delete': {input:{id:ID};result:DeletedResource;mode:'write'};
   'automations.fire': {input:EvaluationInput;result:FireResult;mode:'write'};
+  'automations.approveStartProposal': {input:{id:ID;proposalId:ID;weekday:number};result:Automation;mode:'write'};
+  'automations.startProposals': {input:{};result:StartProposal[];mode:'read'};
   'automations.list': {input:Query;result:Page<Automation>;mode:'read'};
   'automations.nextRuns': {input:{automationId:ID;count:8}|{draft:ScheduleDraft;count:8};result:ScheduledOccurrence[];mode:'read'};
   'automations.save': {input:RuleInput & {onlyIf?:ExtraCondition[]} & ({kind:'schedule';weekdays:number[];startLocal:string;endLocal:string;endsNextDay:boolean;startAction:UnitAction;endAction:UnitAction}|{kind:'event';condition:ClientCondition;action:UnitAction});result:Automation;mode:'write'};

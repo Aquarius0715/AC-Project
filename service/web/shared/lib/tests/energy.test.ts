@@ -92,6 +92,10 @@ describe("customer energy & cost (FR-C06, FR-C13)", () => {
       .toEqual(["Tamat mesti selepas mula", "Paling lama 366 hari"]);
     const custom = periodRange("custom", NOW, { from: TEXT_2026_09_01T00_00 });
     expect([custom.from, custom.to, custom.days, custom.error]).toEqual(["2026-08-31T16:00:00.000Z", "2026-09-14T01:30:00.000Z", 14, undefined]);
+    // a hand-edited link: a value that is not a date counts as missing (the default start, the current minute), never a RangeError
+    const edited = periodRange("custom", NOW, { from: "abc", to: "2026-13-99T99:99" });
+    expect([edited.from, edited.to, edited.days, edited.error]).toEqual(["2026-09-07T16:00:00.000Z", "2026-09-14T01:30:00.000Z", 7, undefined]);
+    expect(periodRange("custom", NOW, { from: "", to: "" }).from).toBe("2026-09-07T16:00:00.000Z");
   });
 
   it("splits the period into Kuala Lumpur days named in the display language (Figma Client 04a)", () => {

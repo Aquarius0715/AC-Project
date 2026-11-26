@@ -63,6 +63,8 @@ Real device control, external notifications, payments, and API authentication be
 
 The table above is an index. The following sections explain entry conditions, steps, results, and acceptance criteria for each requirement.
 
+As built (2026-11-24): the acceptance cases below are written against the Phase 1A demo (`demoSeed`, /demo events, `acceptancePatches`). In API mode the device answers come from the IoT simulator or a live device through the bridge, /demo offers only a device's connection loss and restoration, the session expiry and the Core API scenario, and the data is reset with `make resetdb`; the Go integration and end-to-end tests check the same behaviour against the Core API (verification plan). Where a case's expected code differs from the Core API, the case says so.
+
 Numbers ①②… in acceptance cells identify observations within that cell. Match independent Given conditions to Then results by meaning; do not confuse multiple assertions with case IDs. D01's cause-based priority table determines one failure code.
 
 Use the fixed fixtures named in the [verification plan](../04-agentic-sdlc/verification.md).
@@ -353,14 +355,14 @@ Design: [DD-T14](../02-design/technician.md#dd-t14-details). Assess parent AT-T1
 
 - **Company request basis**: SRC-06 BIZ-12; Figma-confirmed Technician 02-31 (2026-10-01).
 - **Entry conditions**: Draft report of an in-progress job.
-- **Main flow**: Get signature (or prompted on Submit) → summary of job, work, parts, time on site → signer name and signature → Confirm; or “Customer not present” → reason + site photo.
+- **Main flow**: Get signature (or prompted on Submit) → summary of job, work, parts, time on site → signer name and signature → Save sign-off; or “Customer not available” → reason + site photo.
 - **Business rule BR-T15**: `reports.signOff` attaches the sign-off to the current draft report version; editing the draft afterwards invalidates it (badge returns to “Not signed”). Submitting without a sign-off shows a warning; when the customer is absent the reason is required. The sign-off confirms on-site work only; the customer still confirms and rates after HQ accepts the report (FR-C17).
 - **Resulting business state**: WorkReport.signOff set with reportVersion.
 - **Boundaries/prohibitions**: Neither signature nor absence reason with photo → VALIDATION.
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-T15-N | Draft v2 of job-contractor-a. When: signer “Tan Mei Ling (customer-a)” signs and confirms | signOff.reportVersion=2, badge “Signed 11:38” |
+| AT-T15-N | Draft v2 of job-contractor-a. When: signer “Tan Mei Ling (customer-a)” signs and confirms | signOff.reportVersion=2, “Signed · Tan Mei Ling (customer-a) · 11:38” |
 | AT-T15-E | Confirm with an empty pad and no absence reason | VALIDATION |
 | AT-T15-B | Edit the draft after signing | New draft version; signOff cleared; Submit warns “Not signed” |
 

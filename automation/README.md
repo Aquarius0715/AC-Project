@@ -468,3 +468,5 @@ python3 -B -m unittest discover -s automation/tests -v
 追加の`tests/test_approval_history.py`で、90日再生・最終時点表示、現在値と承認値のHTML埋め込み、未来の予定の非参照、日次の間の短い有効期間、承認前の期間の除外、新提案と通知の非抑制、複数の承認履歴保持を検証します。既存の「開始だけ一致して終了や温度が異なる」テストは、一度も全項目が一致した履歴がないケースとして維持しています。
 
 この修正では既存106件＋追加12件の118テストが成功しました。日次HTMLと最終時点HTMLをChromiumで直接開き、現行21:00と反映済みの承認20:00、最初の反映日時、承認IDが分かれて表示されることも確認しています。Ruffの指摘0件、変更Pythonの整形、JavaScriptの構文検証、`git diff --check`も成功しています。検証ログと修正前後のHTMLは`results/approval-history/`内です。
+
+2026-11-24 時点の `main` では、`python3 -B -m unittest discover -s automation/tests` で121テストが成功します（上の件数は各変更時点の記録です）。

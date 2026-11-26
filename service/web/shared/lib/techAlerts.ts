@@ -52,10 +52,34 @@ const QUALITY: Record<string, string> = { valid: "good", stale: "stale", suspect
 const OPEN: [string, Tone] = ["Open", "crit"]; // an alert of an unknown status reads as open
 const STATE: Record<string, [string, Tone]> = { open: ["Open", "crit"], acknowledged: [ACKNOWLEDGED, "warn"], resolved: ["Resolved", "ok"] };
 
+// what the technician does about an unresolved alert on site, an inspection record first, then by suspected cause, then type, else a fault (IR877): the
+// customer's next steps (IR800) speak to the room's user; these speak to the person at the AC with the work report open
+const CAUSE_NEXT: Record<string, string> = {
+  window_open: "Check that the room's windows and doors are closed and that nothing blocks the airflow, and record what you find in the work report.",
+  insulation_loss: "Look for gaps around the windows, doors and pipe openings, and record what you find in the work report.",
+};
+const TYPE_NEXT: Record<string, string> = {
+  maintenance: "Clean the filter during this visit and record it in the work report.",
+  quality: "Check the room's ventilation and that nothing covers the sensor, then take a new reading.",
+  tamper: "Check the AC's cover and the restriction device for signs of opening, and record what you find in the work report.",
+  reconciliation_required: "HQ is checking this AC's restriction. Nothing to do on site.",
+  restriction_bypass: "Check that the restriction device has power and is in sight of the AC. HQ checks the unit.",
+};
+const INSPECTION_NEXT = "A technician's note. Nothing to do unless the problem comes back.";
+const FAULT_NEXT = "Find the cause on site and record it in the work report.";
+/** The on-site next step of an unresolved alert; null once it is resolved (IR877). */
+export function techAlertNext(a: Pick<ApiTechAlert, "causeCode" | "type" | "evidenceKind" | "status">, t: T): string | null {
+  if (a.status === "resolved") return null;
+  if (a.evidenceKind === "inspection") return t(INSPECTION_NEXT);
+  return t(lookup(CAUSE_NEXT, a.causeCode) ?? lookup(TYPE_NEXT, a.type) ?? FAULT_NEXT);
+}
+
 interface EvidenceCard { kind: string; title: string; value: string; sub: string }
 export interface AlertView {
   id: string; version: number; status: ApiTechAlert["status"]; severity: ApiTechAlert["severity"]; policyless: boolean;
   banner: { title: string; sub: string; tone: Tone; state: string | null };
+  /** what to do on site, in the display language; null once resolved (IR877) */
+  next: string | null;
   cards: EvidenceCard[];
   resolution: { info: string | null; done: string | null; note: string; forbidden: string };
   history: { id: string; time: string; title: string; sub: string; badge: { text: string; tone: Tone } }[];
@@ -74,10 +98,15 @@ function resolveWay(canResolve: boolean, hasRule: boolean): string {
 function stateTime(a: ApiTechAlert): string {
   return (a.status === "resolved" ? a.resolvedAt : a.acknowledgedAt) ?? a.detectedAt;
 }
-/** What resolves an open alert: a remeasurement within its recovery, or only a reason when it has no policy. */
-function resolutionInfo(words: { recovery: string } | null, t: T): string {
-  return words ? t("Automatic resolution needs a remeasurement {recovery} — or a reason below with “Resolve alerts”.", { recovery: words.recovery })
-    : t("No remeasurement resolves this alert — it has no policy. Resolve it with a reason below with “Resolve alerts”.");
+/** What resolves an open alert: a remeasurement within its recovery, or only a reason when it has no policy. The
+button below is “Resolve alert”; only a user with “Resolve alerts” may use it (IR877). */
+function resolutionInfo(words: { recovery: string } | null, canResolve: boolean, t: T): string {
+  if (words) {
+    return canResolve ? t("It resolves on its own once a remeasurement stays {recovery}. You can also resolve it below with a reason.", { recovery: words.recovery })
+      : t("It resolves on its own once a remeasurement stays {recovery}. Resolving it with a reason needs “Resolve alerts”.", { recovery: words.recovery });
+  }
+  return canResolve ? t("A new reading does not resolve this alert on its own. Once you have checked, resolve it below with a reason.")
+    : t("A new reading does not resolve this alert on its own. Once you have checked, ask a user with “Resolve alerts” to resolve it.");
 }
 /** The selected alert as the screen shows it. `latest` is the unit's latest reading of the rule's metric (units.get);
 `job` the URL's job (jobs.get); `canResolve` whether the user holds alert.resolve. */
@@ -108,11 +137,12 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
     banner: {
       title: `${a.id.slice(0, 8)} · ${title}`,
       state: a.status === "open" ? null : `${t(state)} · ${when(stateTime(a))}`,
-      sub: words ? words.policy : t("{kind} · no policy — it resolves only with a reason", { kind: t(lookup(KIND, a.evidenceKind) ?? "Evidence") }),
+      sub: words ? words.policy : t("{kind} · resolves only with a reason", { kind: t(lookup(KIND, a.evidenceKind) ?? "Evidence") }),
       tone,
     },
+    next: techAlertNext(a, t),
     resolution: {
-      info: a.status === "resolved" ? null : resolutionInfo(words, t),
+      info: a.status === "resolved" ? null : resolutionInfo(words, ctx.canResolve, t),
       done: a.status === "resolved" ? [t("Resolved {time} — {reason}.", { time: when(a.resolvedAt ?? a.detectedAt), reason: a.resolutionReason ? resolutionText(a.resolutionReason, t) : t("no reason recorded") }), a.acknowledgedAt ? t("Acknowledged {time}.", { time: when(a.acknowledgedAt) }) : ""].filter(Boolean).join(" ") : null,
       note: a.status === "resolved" ? t("Completing the job alone never resolves an alert. If the condition returns, a new alert is created that links back to alert {id}.", { id: a.id.slice(0, 8) })
         : t("If it recurs after it is resolved, a new alert is created that links back to this one."),

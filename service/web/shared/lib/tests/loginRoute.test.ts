@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { GET } from "@ac/web/bff/auth/login/route";
+import { LOGIN_HINT_COOKIE, seal } from "@ac/web/lib/session";
 
 vi.mock("server-only", () => ({}));
 
@@ -10,6 +11,10 @@ const start = async (query: string, host?: string) => {
   const to = new URL(res.headers.get("location") ?? "");
   return { to, params: to.searchParams, cookie: res.headers.get("set-cookie") ?? "" };
 };
+
+/** The login_hint a start with `query` sends, when the browser holds the hint cookie `value`. */
+const hinted = (query: string, value: string) => GET(new NextRequest(`http://localhost:3000/bff/auth/login?${query}`, { headers: { cookie: `${LOGIN_HINT_COOKIE}=${value}` } }))
+  .then((res) => new URL(res.headers.get("location") ?? "").searchParams.get("login_hint"));
 
 // IR790: the app's /login goes straight here; the BFF starts the authorization-code flow with PKCE
 describe("GET /bff/auth/login", () => {
@@ -25,6 +30,15 @@ describe("GET /bff/auth/login", () => {
   it("asks for the password again after a revocation (reauth=1)", async () => {
     const { params } = await start("reauth=1");
     expect(params.get("prompt")).toBe("login");
+  });
+
+  // IR876: the provider's form is filled in with this app's last account
+  it("names this app's last account, on a plain start and when the password is asked again", async () => {
+    const cookie = seal({ email: "me@ac.local" });
+    expect(await hinted("reauth=1", cookie)).toBe("me@ac.local");
+    expect(await hinted("returnTo=%2Fcustomer", cookie)).toBe("me@ac.local");
+    expect(await hinted("reauth=1", cookie.slice(0, -2))).toBeNull(); // an altered cookie names nobody
+    expect(await hinted("reauth=1", seal({ email: "not an address" }))).toBeNull();
   });
 
   // IR651: a sign-in that starts on a listed address goes to the identity provider on that address and returns to it

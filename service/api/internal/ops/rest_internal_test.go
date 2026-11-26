@@ -3,6 +3,7 @@ package ops
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -31,6 +32,7 @@ const (
 	fieldAction      = "action"
 	statusOpen       = "open"
 	actionApprove    = "approve"
+	kindSpaceA       = "space a" // a target kind with a space, as the router gives it: decoded
 	pathX            = "/v1/x"
 	pathJobThings    = "/v1/jobs/{jobId}/things"
 )
@@ -69,11 +71,14 @@ type RestInner struct {
 	Other string `json:"name"`
 }
 
-// restEmbedded embeds the paging query and has a field without a JSON name.
+// restEmbedded embeds the paging query and has a field without a JSON name, a field JSON leaves out and a list of
+// integers.
 type restEmbedded struct {
 	paging.Query
 
-	Note string
+	Note   string
+	Hidden string `json:"-"`
+	Counts []int  `json:"counts"`
 }
 
 func restOp(mode Mode, input func() any) *Operation {
@@ -437,7 +442,10 @@ func TestRESTBodyInput(t *testing.T) {
 
 	binding := approveBinding(t)
 	job := uuid.NewString()
-	path := map[string]string{fieldJobID: job, fieldTargetKind: "space%20a"}
+	path := map[string]string{
+		fieldJobID:      job,
+		fieldTargetKind: kindSpaceA,
+	}
 
 	got, fieldErrs := bind(
 		t,
@@ -452,7 +460,7 @@ func TestRESTBodyInput(t *testing.T) {
 	}
 
 	if got[fieldAction] != actionApprove || got[fieldJobID] != job ||
-		object(t, got[fieldTarget])["kind"] != "space a" {
+		object(t, got[fieldTarget])["kind"] != kindSpaceA {
 		t.Fatalf("body input %v", got)
 	}
 
@@ -481,19 +489,29 @@ func TestRESTBodyRefusals(t *testing.T) {
 
 	binding := approveBinding(t)
 	job, other := uuid.NewString(), uuid.NewString()
-	path := map[string]string{fieldJobID: job, fieldTargetKind: "space%20a"}
+	path := map[string]string{
+		fieldJobID:      job,
+		fieldTargetKind: kindSpaceA,
+	}
 
 	for body, wantFE := range map[string]map[string]string{
-		`{"jobId":"` + other + `"}`:     {fieldJobID: apperr.KeyPathMismatch},
-		`{"action":"mark_paid"}`:        {fieldAction: apperr.KeyPathMismatch},
-		`{"target":"unit"}`:             {fieldTargetKind: apperr.KeyPathMismatch},
-		`[1]`:                           {"_": apperr.KeyMalformedInput},
-		`null`:                          {"_": apperr.KeyMalformedInput},
-		`{"a":1} {"b":2}`:               {"_": apperr.KeyMalformedInput},
-		`{"a":1}}`:                      {"_": apperr.KeyMalformedInput},
-		`{"a":1}]`:                      {"_": apperr.KeyMalformedInput},
-		`{"action":"approve"}`:          nil,
-		`{"target":{"kind":"space a"}}`: nil,
+		`{"jobId":"` + other + `"}`: {fieldJobID: apperr.KeyPathMismatch},
+		`{"action":"mark_paid"}`:    {fieldAction: apperr.KeyPathMismatch},
+		`{"target":"unit"}`:         {fieldTargetKind: apperr.KeyPathMismatch},
+		// encoding/json matches names in any case, so a key in another case would set the path's field
+		`{"jobid":"` + other + `"}`:          {fieldJobID: apperr.KeyPathMismatch},
+		`{"JOBID":"` + job + `"}`:            {fieldJobID: apperr.KeyPathMismatch},
+		`{"actioN":"mark_paid"}`:             {fieldAction: apperr.KeyPathMismatch},
+		`{"Target":{"kind":"unit"}}`:         {fieldTargetKind: apperr.KeyPathMismatch},
+		`{"target":{"KIND":"unit"}}`:         {fieldTargetKind: apperr.KeyPathMismatch},
+		`{"jobId":"` + job + `","note":"x"}`: nil,
+		`[1]`:                                {"_": apperr.KeyMalformedInput},
+		`null`:                               {"_": apperr.KeyMalformedInput},
+		`{"a":1} {"b":2}`:                    {"_": apperr.KeyMalformedInput},
+		`{"a":1}}`:                           {"_": apperr.KeyMalformedInput},
+		`{"a":1}]`:                           {"_": apperr.KeyMalformedInput},
+		`{"action":"approve"}`:               nil,
+		`{"target":{"kind":"space a"}}`:      nil,
 	} {
 		if _, fieldErrs := bind(
 			t,
@@ -617,7 +635,7 @@ func TestRESTEmbeddedQuery(t *testing.T) {
 		t,
 		binding,
 		http.MethodGet,
-		"/v1/x?limit=5&sort=name:desc&Note=hi&status=open",
+		"/v1/x?limit=5&sort=name:desc&Note=hi&status=open&counts=1,2",
 		"",
 		nil,
 	)
@@ -630,9 +648,47 @@ func TestRESTEmbeddedQuery(t *testing.T) {
 		paramSort:    map[string]any{sortKeyField: fieldName, sortKeyDirection: "desc"},
 		"Note":       "hi",
 		fieldFilters: map[string]any{fieldStatus: statusOpen},
+		"counts":     []any{1.0, 2.0},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("input\n got %v\nwant %v", got, want)
+	}
+
+	// a field JSON leaves out is no parameter, and one list item that is not an integer refuses the list
+	_, fieldErrs = bind(t, binding, http.MethodGet, "/v1/x?Hidden=x&counts=1,x", "", nil)
+	if !reflect.DeepEqual(
+		fieldErrs,
+		map[string]string{"Hidden": apperr.KeyNotAllowed, "counts": apperr.KeyInvalid},
+	) {
+		t.Fatalf("refusals %v", fieldErrs)
+	}
+}
+
+// TestRESTMountRefusals: MountREST stops at a route NewBinding refuses and at a route outside /v1/.
+func TestRESTMountRefusals(t *testing.T) {
+	t.Parallel()
+
+	for name, testCase := range map[string]struct {
+		route Route
+		want  error
+	}{
+		"binding":    {Route{Method: http.MethodGet, Path: "/v1/x/{nope}", FixedField: "", FixedValue: ""}, errNotScalar},
+		"outside v1": {Route{Method: http.MethodGet, Path: "/v2/x", FixedField: "", FixedValue: ""}, errOutsideV1},
+	} {
+		operation := restOp(Read, func() any {
+			return new(struct {
+				A string `json:"a"`
+			})
+		})
+		operation.Spec.Routes = []Route{testCase.route}
+
+		reg := NewRegistry()
+		reg.ops = map[string]*Operation{operation.Spec.Name: operation}
+
+		err := reg.MountREST(echo.New().Group("/v1"))
+		if !errors.Is(err, testCase.want) {
+			t.Errorf("%s: %v", name, err)
+		}
 	}
 }
 
@@ -911,6 +967,28 @@ func checkRouteDeleteAndVerbs(t *testing.T, send routeSender, billing *Principal
 	); code != 200 ||
 		data["reason"] != "duplicate entry" {
 		t.Fatalf("delete: %d %v", code, data)
+	}
+
+	// A path parameter is decoded once: the router decodes it unless net/url kept the escaped path (URL.RawPath, as
+	// for %6D or %2F), and the binding decodes it then. Decoding it twice would read %256Dine as "mine" and refuse an
+	// ID that holds a "%".
+	for path, id := range map[string]string{
+		"/v1/units/%6Dine":     ownUnit,
+		"/v1/units/%256Dine":   "%6Dine",
+		"/v1/units/100%25":     "100%",
+		"/v1/units/a%2Fb%2541": "a/b%41",
+	} {
+		if code, data, body := send(
+			billing,
+			http.MethodDelete,
+			path+"?reason=duplicate",
+			"",
+			"key-delete-"+id,
+			"4",
+		); code != 200 ||
+			data["id"] != id {
+			t.Errorf("delete %s: %d %v %s", path, code, data, body)
+		}
 	}
 
 	for path, action := range map[string]string{

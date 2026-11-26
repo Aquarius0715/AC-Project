@@ -278,7 +278,7 @@ func TestCustomersSaveAndRename(t *testing.T) {
 			`"},"name":"Bedroom AC #2"}`,
 		0,
 	); code != 422 ||
-		fields(res) != "expectedVersion=error.required" {
+		fields(res) != requiredExpectedVersion {
 		t.Fatalf("missing version: %d %v", code, res)
 	}
 

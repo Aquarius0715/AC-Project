@@ -41,4 +41,10 @@ describe("HQ device registry", () => {
     const page = await registryPage("", "stale", null);
     expect([calls.length, calls[1]?.cursor, page.items.length]).toStrictEqual([2, undefined, 1]);
   });
+
+  it("keeps a cursor read that fails for another reason a failure", async () => {
+    dal.coreOp.mockRejectedValue(new TypeError("fetch failed"));
+    await expect(registryPage("", "page-2", null)).rejects.toThrow("fetch failed");
+    expect(dal.coreOp).toHaveBeenCalledOnce(); // not read again from the first page
+  });
 });

@@ -112,7 +112,7 @@ function PoliciesPanel() {
         </div>
         <p className={cx("flex items-center gap-1 text-xs", isRecOk ? "text-ok" : "text-crit")}><Icon name={isRecOk ? "check" : "error"} />{isRecOk ? `Recovery ${f.rec} is below the ${f.val} limit` : `Recovery must be below the ${f.val} limit`}</p>
         <Field label="Severity"><Choice<Severity> value={f.sev} onChange={(v) => { setF({ ...f, sev: v }); }} options={[{ id: "normal", label: "Info" }, { id: "warning", label: "Warning" }, { id: "critical", label: "Critical" }]} /></Field>
-        <p className="text-[11px] text-muted-foreground">WhatsApp is only available after you allow it in Preferences. Missing or stale readings never trigger — they show “not measured”.</p>
+        <p className="text-[11px] text-muted-foreground">WhatsApp alerts are not available yet. Missing or stale readings never trigger — they show “not measured”.</p>
       </Modal>
     </>
   );

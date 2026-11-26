@@ -92,7 +92,7 @@ export function AlertsLiveView({ live }: Readonly<{ live: AlertsLive }>) {
           </div>
           {failed && <Banner tone="warn">{failed}</Banner>}
           <Card title={t("Needs attention")} sub={t("Unresolved warnings & faults — stays here until resolved, even after you read it")} action={<Badge tone="warn">{attn.length}</Badge>}>
-            {attn.length > 0 ? attn.map((a) => renderItem(a)) : <p className="text-xs text-muted-foreground">{t(live.unreadOnly || live.severity ? "Nothing in this filter." : "Nothing needs your attention.")}</p>}
+            {attn.length > 0 ? attn.map((a) => renderItem(a)) : <p className="text-xs text-muted-foreground">{t(live.unreadOnly || live.severity || live.unitId ? "Nothing in this filter." : "Nothing needs your attention.")}</p>}
           </Card>
           <Card title={t("Reminders & information")} sub={t("Maintenance reminders, inspection records, notices and resolved alerts")} action={<Badge tone="muted">{info.length}</Badge>}>
             {info.length > 0 ? shownInfo.map((a) => renderItem(a)) : <p className="text-xs text-muted-foreground">{t("Nothing here.")}</p>}

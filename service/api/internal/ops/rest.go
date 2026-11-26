@@ -553,9 +553,26 @@ func convert(k ParamKind, text string) (any, bool) {
 	return text, true
 }
 
-// place sets value at the path unless the object already holds another value there.
+// caseTwin reports whether obj holds key in another letter case. decodeInput (encoding/json) matches field names in
+// any case, so such a key would set the same field and could replace the value placed at key.
+func caseTwin(obj map[string]any, key string) bool {
+	for other := range obj {
+		if other != key && strings.EqualFold(other, key) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// place sets value at the path unless the object already holds another value there, or holds a key on the path in
+// another letter case.
 func place(obj map[string]any, fieldPath []string, value any) bool {
 	for _, key := range fieldPath[:len(fieldPath)-1] {
+		if caseTwin(obj, key) {
+			return false
+		}
+
 		next, present := obj[key]
 		if !present || next == nil {
 			nested := map[string]any{}
@@ -574,6 +591,10 @@ func place(obj map[string]any, fieldPath []string, value any) bool {
 	}
 
 	leaf := fieldPath[len(fieldPath)-1]
+	if caseTwin(obj, leaf) {
+		return false
+	}
+
 	if old, present := obj[leaf]; present && old != nil {
 		oldJSON, oldErr := json.Marshal(old)
 		newJSON, newErr := json.Marshal(value)
@@ -695,14 +716,22 @@ func (b *Binding) queryInput(obj map[string]any, query url.Values, fieldErrs map
 	}
 }
 
-// pathInput places the path parameters; an ID that is not a UUID names no resource (NOT_FOUND).
+// pathInput places the path parameters; an ID that is not a UUID names no resource (NOT_FOUND). The router matches
+// the escaped path, and so leaves a parameter escaped, only when net/url kept one (URL.RawPath, as for %2F);
+// otherwise the parameter is already decoded, and decoding it again would read %256D as "m".
 func (b *Binding) pathInput(
 	ectx *echo.Context,
 	obj map[string]any,
 	fieldErrs map[string]string,
 ) error {
 	for _, name := range b.Path {
-		raw, err := url.PathUnescape(ectx.Param(name))
+		raw := ectx.Param(name)
+
+		var err error
+		if ectx.Request().URL.RawPath != "" {
+			raw, err = url.PathUnescape(raw)
+		}
+
 		if param := b.Params[name]; param.UUID && err == nil && raw != "" {
 			_, perr := uuid.Parse(
 				raw,

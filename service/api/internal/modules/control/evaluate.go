@@ -243,7 +243,7 @@ func extrasMatch(
 		}
 
 		_ = json.Unmarshal(rawMessage, &extra)
-		if extra.Type == "weekday" {
+		if extra.Type == condWeekday {
 			loc, err := time.LoadLocation(timezone)
 			if err != nil {
 				return reasonNoMatch
@@ -1340,7 +1340,7 @@ func (m Automations) simulate(
 //	@Description	Validation: D01; input constraints in the corresponding DD; IR215 records skips whose own trigger \
 //	@Description	held (reason in automation_runs)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-//	@Description	Design: DD-A11, DD-A12, DD-C04, DD-C05, DD-A05
+//	@Description	Design: DD-A11
 //	@Tags			automations
 //	@Accept			json
 //	@Produce		json

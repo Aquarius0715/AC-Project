@@ -182,7 +182,7 @@ func (in *SetPoliciesInput) Validate() map[string]string {
 //	@Description	IR108 only policies of the unit customer; the default policy is implicit and cannot be listed or \
 //	@Description	removed
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
-//	@Description	Design: DD-C03, DD-C15, DD-A02, DD-A05
+//	@Description	Design: DD-C03, DD-C15, DD-A02
 //	@Tags			units
 //	@Accept			json
 //	@Produce		json

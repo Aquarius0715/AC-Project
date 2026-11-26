@@ -1,12 +1,12 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "63e7ce5860cf29d1e3daaca8f4be7067c3193157070fe9d05148a563fd6ab5db",
+  "spec_baseline_id": "877812dde92e5c6a687100f1ab6f5a68acc5ec40b041a9cfbcc544032a1c68ac",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "fecbe4d97cc2c1511d310b58a1687d2897bf16ca445bba58d0ec1e02dd939aa1"
+      "sha256": "907a0dde5ad22533e330e28a85a0b54c4d4dbd9885f5993d5b3065c9bd7810ed"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -74,23 +74,23 @@
     },
     {
       "path": "01-requirements/admin.md",
-      "sha256": "c8152e8af07d0f28d7c5d5a31dbeaa1b5d155cbfe60c683353a9d6623ed13a5c"
+      "sha256": "0adf13b61776b7977a55873ad9c5f7f27e934d6078b20f5833728a574277b72b"
     },
     {
       "path": "01-requirements/client.md",
-      "sha256": "78c674fb03920b3c2a9dcb93fddfc418a34406c58b4d2eda4dab066ec9eb5ccf"
+      "sha256": "7287080f9bdd9507b76e39807597c43ef7cae1eff117dc7bf140b83612063119"
     },
     {
       "path": "01-requirements/common.md",
-      "sha256": "f25ee23d2d53241c458c8621f2119011bc3e8f87be99b0c284b4ad8805aeeaea"
+      "sha256": "daad945388617abbbad57ea5ab0cc3674d886c5d75378893df2db6c51f909717"
     },
     {
       "path": "01-requirements/contractor.md",
-      "sha256": "2b9b97a041e9cf108bba344b11477933ccbc8ad17d6ce01649fc4789451a2fed"
+      "sha256": "67d340651d172b0f8fd55e9ac04de48def23bafb98aef6a1e1f0554fb7648b2a"
     },
     {
       "path": "01-requirements/technician.md",
-      "sha256": "e53898c07fe0f11ccb1042dc292a056208c3f0f1df79767d4c53d02676628f78"
+      "sha256": "aaa8bbe27ba0dd8ccd60bcfb9d11c06e8147bbf34e80050b21fffddab85f9af8"
     },
     {
       "path": "01-requirements/use-case-catalogue.csv",
@@ -98,43 +98,43 @@
     },
     {
       "path": "02-design/admin.md",
-      "sha256": "100b13e59b687052e0980931b185da0fc3d26934b7ad368e3599c7be610e15c6"
+      "sha256": "3a7c46320f9b5db6c5df25badfe655083c044529f180b8f977e66792e1cc2832"
     },
     {
       "path": "02-design/api/swagger.json",
-      "sha256": "8132ae4e287abc85c478c4f5b0958ce91af060b4132e2831d56dbe4b612ed186"
+      "sha256": "2447e639d043fdc1e835ac0452af80380b6def07a37f29f469a3c636511f20f5"
     },
     {
       "path": "02-design/backend-architecture.md",
-      "sha256": "8661dac0952301dab5f30bf83d9246d9773f55dfd23393945ace0a3e1ea1c7dd"
+      "sha256": "94b52af0cf846df83491f144955f1870322615e8ea2e1cef358815949029e3bf"
     },
     {
       "path": "02-design/backend-go-design.md",
-      "sha256": "77815bae30f1e5125576cfd86ec1781ccaea64523110d909a00382d8bdef5b2b"
+      "sha256": "545b4f4c49a347a96afb6473a7187bd62d335fd68480f970d6604172114b083e"
     },
     {
       "path": "02-design/client.md",
-      "sha256": "ed47f17101fcf7eb75ecfe0193d41e0970943ac9375f84348fcab9d15c9644ad"
+      "sha256": "548ce492a5261b6c5d4191ed8affcb6191c0b9f271776e068f862d384d257c62"
     },
     {
       "path": "02-design/common.md",
-      "sha256": "f0a9a819c92358548472af08a91e3dd3030ddd635200505f6a44c7d533a9ca33"
+      "sha256": "b7d61a6f393465c9711f2cc766bba8d4ba933d15309219cf7ec01d0c56b9e09d"
     },
     {
       "path": "02-design/container-design.md",
-      "sha256": "5ba02471676e4a210d5abbf0d3183d436ce6d436c7f80f0ee3813429c356febb"
+      "sha256": "5acf7dc74c9a2532010d16329358b089f51a4a2110d3110ed997e45ed5c9aba4"
     },
     {
       "path": "02-design/contractor.md",
-      "sha256": "f8d8e57930bf1a50c54255564cdf7365d1c11b8a62565f9ec639c26d721ba35a"
+      "sha256": "a24dd9a1e8813a796c17844891b5a6c6245363fac31774cc9e9a7bb48856bc80"
     },
     {
       "path": "02-design/database-design.md",
-      "sha256": "37ca445fe2a6f06c4bc69e4d2e6da96c84376dd7d4da4a25f93454ce9352ba8c"
+      "sha256": "0043da0119424fbb98a9d7bb01ca9c2d06da2a1b883ab383e3b1571ef75d2d25"
     },
     {
       "path": "02-design/deterministic-contracts.md",
-      "sha256": "c5f604ff2f4c2a51a9fee127813972628f0ff5e99df4adad6072e438011edf3a"
+      "sha256": "de77bea407dd2f9c727d38f8e3c0ededfd587ee915969f0c39cdc8157b483c9a"
     },
     {
       "path": "02-design/device-firmware.ja.md",
@@ -146,23 +146,23 @@
     },
     {
       "path": "02-design/implementation-contracts.md",
-      "sha256": "1b98066a47f14d01ae7e3903c7ea371e56d681b02a80c5b0ef54de57660db7bb"
+      "sha256": "838f0485f1f19b43fe5fdefc5ffe5d0c0f601106314b97c67555ee74b7c13b8d"
     },
     {
       "path": "02-design/load-test.md",
-      "sha256": "3599c8746f28bd62c6de2612e8c9e321d0cad87da3cc1523afad92a81f60a12e"
+      "sha256": "86c51b366b3e6e6a829524a13ff25a46726000e9a95fe52c9cb79839975e8eca"
     },
     {
       "path": "02-design/network-architecture.md",
-      "sha256": "b261065a3c4dec270545329d62e7a9a4a7744ee321330fe066a7e104f8f959db"
+      "sha256": "aa3ff4cb7f6056a8d66fe97ba16ba6338349fbaafcfc0d0ccbca2ff834cd9599"
     },
     {
       "path": "02-design/operation-catalog.csv",
-      "sha256": "d1300aa3e5d35ac86dcef0efd365c4ae3e49da7f12402a6939c507d1d0aa9cda"
+      "sha256": "8c971c59e2217da4511442d4106f53bb641dbf17c109100d60786161a35f9906"
     },
     {
       "path": "02-design/operation-persistence-map.csv",
-      "sha256": "99b16c60e0f558974fde94a25d594419a0411a02b74be8a4a7eed1a1b3e18abb"
+      "sha256": "e246aabd8dcf39d10352c8d30ab38c36bd7c7f3d4505f1a3d7d28e069c522d35"
     },
     {
       "path": "02-design/query-catalog.csv",
@@ -170,35 +170,35 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "8c7dedd2cd3f2abdbe7d99e09478cbaced288955a81d50aabd1476f939734de6"
+      "sha256": "9add0d1847e9c63137aefadbaa193835f69a33b008855664ba5aeb0b6423cc4a"
     },
     {
       "path": "02-design/service-contracts.ts",
-      "sha256": "6b7e23cbd4166a64efc350b6c2af380d7a7269265baf9a9a06871af7bf095d30"
+      "sha256": "42aae2dd4ec49f01cc834c4e043eeade02fd0773fe928680401cacd668af141e"
     },
     {
       "path": "02-design/strict-review-contracts.md",
-      "sha256": "9b8f7f977bf5320a1dc4c6f1c6ef85168b4ffa66ed4aff5508651da754cde367"
+      "sha256": "9066bfe12c2a6c8119353d31a23fa0cc15a6fa2435e88ffa58ccd3d4c4d2c09f"
     },
     {
       "path": "02-design/technician.md",
-      "sha256": "787653897481ef62687c8b21151e4e67bf3719068f89d7365e5a1060ccebc4d1"
+      "sha256": "06fc5706915447c8f65032658c2eda304514783335ed1b0753bf90d3c69c59ef"
     },
     {
       "path": "02-design/write-version-catalog.csv",
-      "sha256": "306753088a22ffaa3b382c91943413f5f22fa72266c0fd2c2b82cab61b1780f1"
+      "sha256": "ba9166511835f188ef01e0d440270d3353f71fde1fe940e7126b05536cc8394d"
     },
     {
       "path": "03-uiux/UIUXSpecification.md",
-      "sha256": "f68f3ed9656f488afcf351596b7e7901369d89c9d9d4aa393f085138ae3ae2cc"
+      "sha256": "a712cb5a71e90a6caefdb2a53d4746e6a9beadc77c254036876e6cb0d7aac6cd"
     },
     {
       "path": "03-uiux/component-contracts.csv",
-      "sha256": "0cbc0bf0cd70600760174532f2f39541e8ad4394e8519dd7083627278029feb4"
+      "sha256": "6e5ce25ea9de3f71782ba0b3be72c717a9d90dd6c481855c91fa965c8706e866"
     },
     {
       "path": "03-uiux/screen-catalog.csv",
-      "sha256": "ce7c32c2ea68f066a85f43fbbe2105d3e9d6bbe81e33035c3267005b632f5c93"
+      "sha256": "644c827924769c02e8ec1696054c498ca6bffe0298e375a4af3a3490b0ed3c9b"
     },
     {
       "path": "04-agentic-sdlc/README.md",
@@ -294,15 +294,15 @@
     },
     {
       "path": "04-agentic-sdlc/verification.md",
-      "sha256": "27cea0b5f01edfc3fdaefd74f83ef4da0fcf3389706b41f587398521ab610c39"
+      "sha256": "0974ba7b21e33694bda89185d574ce71679534b161c441135e98e7eb073ca5d9"
     },
     {
       "path": "README.md",
-      "sha256": "daba4db12bd19bd1709541b1d2e34ca5bd85c059ec734e0323ba9deb805a0e44"
+      "sha256": "e7d424a0ee1ff31f1c72871716118939c4199a96248b05d97493ebbf4ceccabf"
     },
     {
       "path": "tools/check_review_regressions.py",
-      "sha256": "50abda188b32aa465167e83833f82618e1e948d6cca37deabb2d2dca7e156901"
+      "sha256": "ad8c5063581069e93cb793f955a8018b3f94007c4e37d6bce066c08d7d52b4f2"
     },
     {
       "path": "tools/gen_operation_persistence_map.py",
@@ -310,7 +310,7 @@
     },
     {
       "path": "tools/validate_documents.py",
-      "sha256": "b09d15e6659c1124ef584c81b45820c4f7498d7ce3b5c21f7af2174a9073f64d"
+      "sha256": "9a76db85e36bce3b51db47dc5d52d3325f476d1fe730607b04d10e8a8d93de26"
     }
   ]
 }

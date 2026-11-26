@@ -4,6 +4,11 @@
     "ja": "{field}：{n} 文字までです",
     "ms": "{field}: paling banyak {n} aksara"
   },
+  "{kind} · no policy — it resolves only with a reason": {
+    "id": "{kind} · tanpa kebijakan — hanya terselesaikan dengan alasan",
+    "ja": "{kind} · ポリシーなし — 理由を添えた場合のみ解決できます",
+    "ms": "{kind} · tiada dasar — ia hanya diselesaikan dengan sebab"
+  },
   "{min}–{max}°C": {
     "id": "{min}–{max}°C",
     "ja": "{min}–{max}°C",
@@ -13,6 +18,11 @@
     "id": "Izinkan lokasi “Selalu” agar tiba dan pergi dilaporkan saat aplikasi ditutup.",
     "ja": "アプリを閉じている間も到着と出発を報告するには、位置情報を「常に」許可してください。",
     "ms": "Benarkan lokasi “Sentiasa” supaya ketibaan dan keluar dilaporkan semasa aplikasi ditutup."
+  },
+  "Automatic resolution needs a remeasurement {recovery} — or a reason below with “Resolve alerts”.": {
+    "id": "Penyelesaian otomatis memerlukan pengukuran ulang {recovery} — atau alasan di bawah dengan “Selesaikan peringatan”.",
+    "ja": "自動で解決するには、再測定が {recovery} になる必要があります — または、下で理由を添えて「アラートの解決」で解決します。",
+    "ms": "Penyelesaian automatik memerlukan pengukuran semula {recovery} — atau sebab di bawah dengan “Selesaikan amaran”."
   },
   "Location automations cannot run until you grant it again. Manual control and schedules are unaffected.": {
     "id": "Otomasi lokasi tidak dapat berjalan sampai Anda memberikannya lagi. Kontrol manual dan jadwal tidak terpengaruh.",
@@ -28,6 +38,11 @@
     "id": "Tidak ada koneksi — periksa jaringan dan coba lagi",
     "ja": "接続できません — ネットワークを確認して、もう一度お試しください",
     "ms": "Tiada sambungan — semak rangkaian dan cuba lagi"
+  },
+  "No remeasurement resolves this alert — it has no policy. Resolve it with a reason below with “Resolve alerts”.": {
+    "id": "Tidak ada pengukuran ulang yang menyelesaikan peringatan ini — tidak memiliki kebijakan. Selesaikan dengan alasan di bawah dengan “Selesaikan peringatan”.",
+    "ja": "再測定ではこのアラートは解決されません — ポリシーがないためです。下で理由を添えて「アラートの解決」で解決してください。",
+    "ms": "Tiada pengukuran semula yang menyelesaikan amaran ini — ia tiada dasar. Selesaikannya dengan sebab di bawah dengan “Selesaikan amaran”."
   },
   "None of your homes or offices has a map pin yet — HQ sets them.": {
     "id": "Belum ada rumah atau kantor Anda yang memiliki pin peta — HQ yang menetapkannya.",

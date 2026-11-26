@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alertChoices, alertView, durationText, refusal, ruleWords, selectAlert, type ApiTechAlert } from "@ac/web/lib/techAlerts";
+import { alertChoices, alertView, durationText, refusal, ruleWords, selectAlert, techAlertNext, type ApiTechAlert } from "@ac/web/lib/techAlerts";
 import { EN, i18nOf } from "@ac/web/lib/i18n";
 import { unitDetail } from "./unitFixture";
 
@@ -20,6 +20,7 @@ const unit = unitDetail({
   latestMeasurements: [{ id: "m1", unitId: "u1", sensorId: "s", metric: "temperature", value: 30.4, unit: "°C", observedAt: "2026-09-14T01:35:00Z", origin: "measured", quality: "valid", qualityReason: null }],
 });
 const ctx = { alerts: [base, earlier], job: { id: "job-t07-0000", type: "preventive" }, canResolve: false, unit };
+const info = (a: ApiTechAlert, canResolve: boolean) => alertView(a, { ...ctx, canResolve }, NOW).resolution.info;
 
 describe("technician alert evidence", () => {
   it("words the rule that raised the alert (IR284, D08)", () => {
@@ -37,7 +38,7 @@ describe("technician alert evidence", () => {
       { kind: "Measured", title: "Latest reading", value: "30.4 °C", sub: "observed today 9:35 am MYT · good" },
     ]);
     expect(v.resolution).toStrictEqual({
-      info: "Automatic resolution needs a remeasurement < 28.0 °C for 60 s — or a reason below with “Resolve alerts”.", done: null,
+      info: "It resolves on its own once a remeasurement stays < 28.0 °C for 60 s. Resolving it with a reason needs “Resolve alerts”.", done: null,
       note: "If it recurs after it is resolved, a new alert is created that links back to this one.",
       forbidden: "Not resolved — you don’t have “Resolve alerts”. The alert resolves automatically once a remeasurement stays < 28.0 °C for 60 s, or ask a permitted user.",
     });
@@ -51,7 +52,7 @@ describe("technician alert evidence", () => {
   it("shows a resolved alert without a policy (IR66)", () => {
     const done: ApiTechAlert = { ...base, id: "alert-win-1", rule: null, policyId: null, evidenceKind: "inferred", status: "resolved", acknowledgedAt: "2026-09-14T01:25:00Z", resolvedAt: "2026-09-14T01:30:00Z", resolutionReason: "Window closed", previousAlertId: null };
     const v = alertView(done, { ...ctx, job: null, unit: null, canResolve: true }, NOW);
-    expect([v.banner.sub, v.banner.tone, v.banner.state]).toStrictEqual(["Suspected · no policy — it resolves only with a reason", "ok", "Resolved · today 9:30 am MYT"]);
+    expect([v.banner.sub, v.banner.tone, v.banner.state]).toStrictEqual(["Suspected · resolves only with a reason", "ok", "Resolved · today 9:30 am MYT"]);
     expect(v.cards).toHaveLength(1); // no rule: no latest reading of its metric
     expect(v.resolution).toMatchObject({ info: null, done: "Resolved today 9:30 am MYT — Window closed. Acknowledged today 9:25 am MYT.", note: "Completing the job alone never resolves an alert. If the condition returns, a new alert is created that links back to alert alert-wi." });
     expect(v.history.map((h) => h.title)).toStrictEqual(["Resolved", "Acknowledged", "Raised"]);
@@ -59,6 +60,24 @@ describe("technician alert evidence", () => {
     expect(alertView({ ...base, rule: null }, { ...ctx, canResolve: false }, NOW).related[5]?.[1]).toBe("no — ask a user with “Resolve alerts”");
     expect(alertView(base, { ...ctx, canResolve: true }, NOW).related[5]?.[1]).toBe("with a reason, or by a remeasurement");
     expect(alertView({ ...base, rule: null }, { ...ctx, canResolve: true }, NOW).related[5]?.[1]).toBe("with a reason");
+  });
+
+  it("says how an open alert resolves, as far as the technician may resolve it (IR877)", () => {
+    expect(info(base, true)).toBe("It resolves on its own once a remeasurement stays < 28.0 °C for 60 s. You can also resolve it below with a reason.");
+    expect(info({ ...base, rule: null, policyId: null }, true)).toBe("A new reading does not resolve this alert on its own. Once you have checked, resolve it below with a reason.");
+    expect(info({ ...base, rule: null, policyId: null }, false)).toBe("A new reading does not resolve this alert on its own. Once you have checked, ask a user with “Resolve alerts” to resolve it.");
+  });
+
+  it("names what to do on site for an unresolved alert: by cause, type, inspection, else a fault (IR877)", () => {
+    const next = (over: Partial<ApiTechAlert>) => techAlertNext({ ...base, ...over }, EN.t);
+    expect(next({ causeCode: "window_open" })).toBe("Check that the room's windows and doors are closed and that nothing blocks the airflow, and record what you find in the work report.");
+    expect(next({ causeCode: "insulation_loss", type: "tamper" })).toMatch(/^Look for gaps/);
+    expect(next({ type: "maintenance" })).toBe("Clean the filter during this visit and record it in the work report.");
+    expect(next({ type: "reconciliation_required", status: "acknowledged" })).toBe("HQ is checking this AC's restriction. Nothing to do on site.");
+    expect(next({ evidenceKind: "inspection", type: "maintenance" })).toBe("A technician's note. Nothing to do unless the problem comes back.");
+    expect(next({})).toBe("Find the cause on site and record it in the work report.");
+    expect(next({ status: "resolved" })).toBeNull();
+    expect(alertView({ ...base, causeCode: "window_open" }, ctx, NOW, MS).next).toBe("Pastikan tingkap dan pintu bilik tertutup dan tiada apa yang menghalang aliran udara, dan rekodkan apa yang anda dapati dalam laporan kerja.");
   });
 
   it("opens the URL's alert, else the worst unresolved, and words refusals", () => {

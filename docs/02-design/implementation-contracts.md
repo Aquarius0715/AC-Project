@@ -164,6 +164,8 @@ Return only fields needed by each role, even for the same entity. Do not send al
 | RATE_LIMITED | Show waiting time and retry guidance | Show mock retryAfterSeconds. Keep form inputs as usual. As built (IR375): the action's line reads “Too many changes in a short time — try again in N s” from `retryAfterSeconds`. Since IR380 every screen's refusal text falls back to this shared wording, never the raw code and key. Group control waits the seconds and sends again |
 | UNAVAILABLE | Show an in-screen error and allow retry | Automatically retry reads at most twice. Retry writes only on explicit user action |
 
+As built (IR257, IR269, IR380, IR385, IR717): a page's reads run in its Server Component through the DAL, which retries nothing (D04); a failed read shows the route's error state with Retry, a read refused as FORBIDDEN on an HQ page names the permission the role lacks (IR582), and a target that is not found shows the not-found page. A write is a Server Action that returns `{ ok: false, code, messageKey, fieldErrors, retryAfterSeconds }` instead of throwing; `useAction` turns it into one toast line in the display language (`actionMessage`), and a form also shows the field errors under their fields and focuses the first one (IR620). UNAUTHENTICATED (a 401 from the Core API: the session ended, or HQ signed the user out everywhere) drops the stored session: a write then opens the sign-in page with a return address, and the next page asks to sign in. RATE_LIMITED says “Too many changes in a short time — try again in N s”. An action that gets no answer at all reads as UNAVAILABLE. The screens do not look up `writes.getResult` after a TIMEOUT (the operation is there for API clients), and the simulated network loss (`errors.network_disconnected`) is not built: the apps have no subscription to stop.
+
 Follow IR83 for refreshing/failure after successful data and for batching subscription invalidations. Never replace KPI values with zero or healthy values on errors. If keeping previous values, mark stale and show last-success time. Do not keep them after target or role changes.
 
 ## DDC-04 Asynchronous and Mock Execution Rules
@@ -175,12 +177,12 @@ This section and DDC-01 define demo timing, limits, counts, and periods. If requ
 | Mock wait timeout | 10 seconds. Normal read wait is fixed at fixture.defaultWaitMs=300 ms (IR74). Control tests with an injected clock |
 | Command expiry | 30 seconds after request (fictional demo value). Scenario events control sending and acknowledgement |
 | Telemetry stale | Per sensor; seed: 120 seconds. Stale when now − observedAt > staleAfterSeconds |
-| Offer expiry | Seed: 24 hours later. Accept only while now < offerExpiresAt. Unanswered expiry returns the job to requested (IR48) |
+| Offer expiry | Seed: 24 hours later. Accept only while now < offerExpiresAt. Unanswered expiry returns the job to requested (IR48). As built HQ enters offerExpiresAt with the offer: in the future, not after the access end nor after the last candidate start (IR457) |
 | Notice period | Seed rule: 24 hours; executeAfter >= noticeAt + 24 hours. Not a commercial rule |
 | OffsetQuote validity | Demo: 15 minutes. Request requires now < expiresAt |
-| Write processing | Shared-memory transition functions check input/version, then update state and display history together. No database transactions are designed |
-| Invalidate | Invalidate affected entities and related summaries using scoped Query keys. Do not manually copy data in UI |
-| Role change | Abort pending requests and remove old Queries. Fetch the new-scope session before rendering. Discard late responses using IR17 Repository instance/generation and viewEpoch |
+| Write processing | Shared-memory transition functions check input/version, then update state and display history together. No database transactions are designed. As built (API mode) each write runs in one Core API database transaction with its event and audit record ([backend Go design](backend-go-design.md)) |
+| Invalidate | Invalidate affected entities and related summaries using scoped Query keys. Do not manually copy data in UI. As built there is no query cache: the page reads everything again after a write (common design §6) |
+| Role change | Abort pending requests and remove old Queries. Fetch the new-scope session before rendering. Discard late responses using IR17 Repository instance/generation and viewEpoch. As built each role is its own app with its own session (IR790); the Core API reads the membership on every request |
 | Reload/reset | Follow DEC-07. Reload restores seed. Role switches preserve tab business data. Reset initializes clock/object URLs and increments generation by 1 |
 
 For normal customer/diagnostic Commands, reject conflicting new requests while the same unit has an unfinished request. Post-payment release is separate coordination: keep release intent, then use D03 per-unit evidence to distinguish undelivered, unapplied, applied, and unknown results. Send release Commands only for applied units; confirmed unapplied units are not_required. Never send apply and release concurrently while unresolved.
@@ -206,12 +208,16 @@ The table summarizes visibility. IR95 is authoritative for whether to generate n
 
 ## DDC-05 Frontend Boundary Completion Criteria
 
+As built (IR257): the screens reach data through the server-side DAL (`shared/lib/dal.ts`), which calls each operation at its Core API REST route; the Phase 1A demo renders fixture rows instead. Pure mappers in `shared/lib` turn the results into display data, and the Vitest suites check them with synthetic results. The criteria below are the Phase 1A proposal.
+
 - Map each [Operation Catalog](operation-catalog.csv) operation to screen input types, return values, and mock results.
 - UI accesses and changes data through service interfaces, without direct dependency on mock implementations.
 - Use synthetic success, accepted/pending, failure, conflict, and access-denied results to verify expected display and recovery.
 - Provide an adapter replacement boundary for a future real API. Replacement alone does not guarantee production connectivity; define D11 production contracts first. HTTP adapter implementation/testing, production authentication, and server processing design are outside these completion criteria.
 
 ## DDC-06 Screen Structure and Local State
+
+As built: a page is a Server Component that reads its data and passes it to one client view; there are no Query hooks and no React Hook Form (DDC-03, common design §6). Targets, periods, tabs and list pages live in the URL, open dialogs and form drafts in the client view's state. The paragraph below is the Phase 1A proposal.
 
 Each role page uses shared Shell and UI patterns. Pages compose URLs, Query hooks, and forms; primitives do not import Repository directly. Keep RHF forms separate using target ID as key. Refetching must not automatically reset unsaved dirty values.
 
@@ -223,13 +229,13 @@ If the main grouped data fetch fails, show a page error. If an independent suppo
 
 | Screen/action | Inputs and defaults | Processing and completion | Failure/cancellation |
 |---|---|---|---|
-| /login | demoActorId: unselected; returnTo: optional relative route | Set a known actor's Membership in the mock session and open its role home. No real email or password needed. API mode (IR385): `?error=revoked` after HQ signed the user out everywhere, `?error=expired` after any other refused session; both keep the page in returnTo | Reject missing/unknown actors. Discard external returnTo URLs |
-| /forgot-password | demoEmail: empty; valid format, at most 254 characters | Show the same demo completion message for registered and unregistered addresses: “Instructions will be shown if applicable” | Send no real email. Invalid format shows a field error |
+| /login | returnTo: optional relative route; error, reauth, signedOut | As built: with the identity service the page goes straight to `/bff/auth/login?returnTo=…`, the identity provider's sign-in screen (IR790); it stays only after a sign-in that came back with `?error=` or after sign-out, with the reason and a Sign in button. The browser demo has no sign-in service: Continue opens the role home, without choosing an actor. API mode (IR385): `?error=revoked` after HQ signed the user out everywhere, `?error=expired` after any other refused session; both keep the page in returnTo | Reject missing/unknown actors. Discard external returnTo URLs |
+| /forgot-password | demoEmail: empty; valid format, at most 254 characters | As built, the page calls no operation: it shows the same preview message for every valid address (“If an account exists for that address, a reset link preview has been sent.”); with the identity service the reset is the identity provider's own (IR646, IR790) | Send no real email. Invalid format shows a field error |
 | /settings/preferences | locale=en, zone=Asia/Kuala_Lumpur, currency=MYR (read-only) | Apply locale immediately. zone is a display setting. currency is a fixed MYR demo display attribute. Show invoices with Money.currency without conversion. Data/contract currencies do not change | Reject unsupported locale or invalid IANA timezone |
 | Shared notifications | unreadOnly=false, cursor=null, limit=25 | Show scoped notifications as Pages. Allow mark-read mutations and navigation via reference IDs. “Mark all as read” sends the listed unread notifications in one `notifications.markAllRead` write and names how many were marked (IR351, IR379) | Expired-scope links show a safe “Unavailable” message. A listed notification that is already read or no longer available is skipped |
 | /demo | scenarioId (1–64-character label), eventType, clockAdvance, reset | Use only allowed synthetic events. IR37 covers transport/network fault injection; IR36 covers clock jumps. Reset updates generation | Reject arbitrary URLs, scripts, and real-device payloads |
 
-Shared logical operations are `demoSession.signIn/signOut/switchMembership/extend`, `auth.previewPasswordReset`, `preferences.get/update`, `notifications.list/markRead/markAllRead`, and `demo.trigger/reset`. demo/auth are mock-only in phase 1A; real authentication integration is outside scope. Keep preferences in a Provider for infrequently changed display settings, separate from business Repository data and invoice currencies.
+Shared logical operations are `demoSession.signIn/signOut/switchMembership/extend`, `auth.previewPasswordReset`, `preferences.get/update`, `notifications.list/markRead/markAllRead`, and `demo.trigger/reset`. As built the shared screens call `preferences.*`, `consents.*`, `twoFactor.*`, `notifications.*`, `demo.trigger` and `demo.advanceClock` (screen catalog); no screen calls `demoSession.*`, `auth.previewPasswordReset` is called from HQ's Customers & units, and `demo.reset` is not offered in API mode. demo/auth are mock-only in phase 1A; real authentication integration is outside scope. Keep preferences in a Provider for infrequently changed display settings, separate from business Repository data and invoice currencies.
 
 ### Permission Names and Eligible Roles
 
@@ -286,7 +292,7 @@ These are phase 1A design proposals under DEC-10, not final commercial business 
 | inquiries.list | Customers receive `Inquiry` linked to their own `invoiceId`/`restrictionId`; HQ receives those within `billing.write` scope | Customers see received/answered and reply. Open the same invoice through answer-notification target.id, then select inquiryId. Never return another customer's reply |
 | devices.addResponseNote | Append `responseNote` (1–1000 characters) to `deviceId`/`eventId` with author, time, and correlation ID | Requires `device.maintain` and active assignment. Notes do not change connection or tamper state. Recovery is a separate `/demo` event |
 
-Keep image bodies in shared Repository `Map<blobId, Blob>`. Sign-out and role switching do not delete shared Blobs. Locally selected unsaved images may be discarded on leave. Remove draft photos through differences in `jobs.saveDraft.attachmentIds`. Keep Blobs referenced by older submitted versions; release unreferenced Blobs. Reset releases all Blobs and temporary URLs. Submission failure must not lose text or saved images.
+As built the Core API keeps uploads in its blob store and each app streams a file back through its own route once the Core API has authorized the read (for example `/technician/jobs/:id/photos/:attachmentId`, `attachments.getContent`; [backend architecture](backend-architecture.md)); no object URL of a report photo is made in the browser. The Phase 1A design follows. Keep image bodies in shared Repository `Map<blobId, Blob>`. Sign-out and role switching do not delete shared Blobs. Locally selected unsaved images may be discarded on leave. Remove draft photos through differences in `jobs.saveDraft.attachmentIds`. Keep Blobs referenced by older submitted versions; release unreferenced Blobs. Reset releases all Blobs and temporary URLs. Submission failure must not lose text or saved images.
 
 `WorkReportDraft` inputs are jobId, reportId (absent initially), items (InspectionItemInput), measurements (InspectionMeasurementInput), parts, workText, nextAction, and attachmentIds. The first response returns reportId/version; updates require `expectedVersion`. Drafts may be incomplete. Submit validates each DD's required fields. Never directly edit submitted/past versions. Rework or reassignment creates a new draft version referencing the old one, preserving past versions and each record's author.
 

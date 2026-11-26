@@ -71,7 +71,10 @@ async function AdminEnergyPageContent({ searchParams }: Readonly<PageProps<"/adm
   };
   if (tab === "analysis") {
     const baseline = all.items.find((b) => b.id === one("baselineId"));
-    const unitIds = one("unitIds")?.split(",").filter(Boolean) ?? baseline?.unitIds ?? unitOptions.filter((u) => !scope.customerId || u.customerId === scope.customerId).map((u) => u.id);
+    // without a unit set or a baseline, the scope's units: the customer's, or one property's when the Overview's Energy link
+    // carries a property (IR878)
+    const inScope = (u: (typeof unitOptions)[number]) => (!scope.customerId || u.customerId === scope.customerId) && (!scope.propertyId || u.propertyId === scope.propertyId);
+    const unitIds = one("unitIds")?.split(",").filter(Boolean) ?? baseline?.unitIds ?? unitOptions.filter((u) => inScope(u)).map((u) => u.id);
     const today = klLocal(now.toISOString()).slice(0, 10);
     const from = fromQ ? klInstant(fromQ) : baseline?.period.from ?? klInstant(`${today}T00:00`);
     const to = toQ ? klInstant(toQ) : baseline?.period.to ?? minute(now).toISOString();

@@ -385,8 +385,8 @@ opnames = unique(operations, 'operation', 'operation')
 opmap = {row['operation']: row for row in operations}
 types = (ROOT / '02-design/service-contracts.ts').read_text()
 typed = {name:(input_, result, mode) for name,input_,result,mode in re.findall(r"^  '([^']+)': \{input:(.*);result:(.*);mode:'(read|write)'\};$", types, re.M)}
-if set(typed) != opnames or len(operations) != 234:  # IR827 payments.startCheckout, IR826 presence.report, IR794 installationRequests.create + list + cancel + decline, IR657 members.delete, IR656 baselines.delete + factors.delete + mrv.deleteDraft, IR655 plans.delete + rateCards.delete, IR654 customers.delete + contractors.delete + organizations.delete, IR653 firmwareCampaigns.delete, IR652 devices.unbind + devices.delete + capabilities.delete, IR648 voice.resolveIntent removed, IR635 devices.setMqttNode, IR612 members.unavailability + members.clearUnavailability, IR437 jobs.getAttachment, IR436 certificates.getContent, IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions
-    fail('234 operation/TypeScript contract keys differ')
+if set(typed) != opnames or len(operations) != 236:  # IR827 payments.startCheckout, IR826 presence.report, IR794 installationRequests.create + list + cancel + decline, IR657 members.delete, IR656 baselines.delete + factors.delete + mrv.deleteDraft, IR655 plans.delete + rateCards.delete, IR654 customers.delete + contractors.delete + organizations.delete, IR653 firmwareCampaigns.delete, IR652 devices.unbind + devices.delete + capabilities.delete, IR648 voice.resolveIntent removed, IR635 devices.setMqttNode, IR612 members.unavailability + members.clearUnavailability, IR437 jobs.getAttachment, IR436 certificates.getContent, IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions
+    fail('236 operation/TypeScript contract keys differ')
 for row in operations:
     name = row['operation']
     if typed.get(name) != (row['input_contract'], row['result_contract'], row['mode']):
@@ -573,7 +573,7 @@ filter_names = set(re.findall(r'(\w+)\?:', query_fields))
 for q in queries:
     if not set(filter(None,q['allowed_filters'].split(','))) - {'none'} <= filter_names:
         fail('Query filter not expressible in DTO '+q['operation'])
-required_dependencies = {'SCR-T04':{'units.get'},'SCR-A09':{'contracts.list','invoices.list','units.list','units.get'},'SCR-A14':{'baselines.list','organizations.list','mrv.versions'},'SCR-T11':{'devices.calibrations','devices.operations','units.get','jobs.list'},'SCR-A04':{'devices.calibrations','devices.operations'},'SCR-A02':{'diagnosticRuns.list','diagnosticRuns.get'}}
+required_dependencies = {'SCR-T04':{'units.get'},'SCR-A09':{'contracts.list','invoices.list','units.list'},'SCR-A14':{'baselines.list','organizations.list','mrv.versions'},'SCR-T11':{'devices.calibrations','devices.operations','units.get','jobs.list'},'SCR-A04':{'devices.calibrations','devices.operations'}}  # SCR-A02 shows no diagnostic runs as built (2026-11-24)
 for screen in screens:
     actual=set(filter(None,screen['operations'].split(';')))
     if not required_dependencies.get(screen['screen_id'],set()) <= actual:
@@ -716,7 +716,7 @@ for name in ['EnergyBaseline','EnergySummary','MRVConditions','BaselineInput']:
         fail('Energy boundary source missing '+name)
 if 'sourceAlertId?:ID' not in typed['notifications.preview'][0]:
     fail('Alert notification classification source missing')
-for sid, dependencies in {'SCR-A05':{'units.list','units.get'}, 'SCR-A08':{'invoices.remind'}, 'SCR-A10':{'restrictions.list','restrictions.get'}}.items():
+for sid, dependencies in {'SCR-A05':{'units.list'}, 'SCR-A08':{'invoices.remind'}, 'SCR-A10':{'restrictions.get'}}.items():  # as built 2026-11-24: A05 reads no single unit, A10 no restriction list
     sc=next(x for x in screens if x['screen_id']==sid)
     co=next(x for x in components if x['component']==sid+' Page')
     if not dependencies <= set(sc['operations'].split(';')):
@@ -916,7 +916,8 @@ if accepted_sort['status']=='accepted':
         fail('Job query status ranking differs from accepted decision')
     # IR217: the technician device screens read jobs.list only to find the assigned job of each unit (IR94) and show no
     # job list, so they have no job sort; every other screen that reads jobs.list shows the list and sorts it (IR34).
-    job_lookups = {'SCR-T11', 'SCR-T12', 'SCR-P10', 'SCR-T02'}  # IR218: P10 lists the jobs still in review as rows of the statement table; IR283: T02 reads the technician's jobs on the unit as its history and the control job
+    job_lookups = {'SCR-T11', 'SCR-T12', 'SCR-P10', 'SCR-T02', 'SCR-P02', 'SCR-P04', 'SCR-T04', 'SCR-A01', 'SCR-A02', 'SCR-C09', 'SCR-P01', 'SCR-P06'}  # 2026-11-24: P02, P04, T04, A01, A02, C09, P01 and P06 read jobs.list as a lookup or a history without a sort control (as built)
+    job_lookups = job_lookups  # IR218: P10 lists the jobs still in review as rows of the statement table; IR283: T02 reads the technician's jobs on the unit as its history and the control job
     for screen in screens:
         if 'jobs.list' not in screen['operations'].split(';'):
             continue
@@ -1025,9 +1026,10 @@ for sid, keys in {'SCR-C01':{'propertyId','unitId'}, 'SCR-C02':{'powerState','co
         fail('IR50 URL keys missing '+sid)
 iot_ops = {'units.get','units.list','telemetry.series','telemetry.summary','devices.get','devices.list','devices.events','commands.create','commands.get','diagnosticRuns.create','diagnosticRuns.get','diagnosticRuns.list','restrictions.forInvoice','restrictions.get','restrictions.list','admin.summary','summaries.get','alerts.list','alerts.get'}
 device_states = {'connecting','device-error','device-online','device-offline'}
+unit_names_only = {'SCR-C10', 'SCR-P06', 'SCR-A03'}  # 2026-11-24: units.list only names the units of invoices, certificates and scopes (as built)
 for screen in screens:
     states = set(screen['states'].split(';'))
-    has_iot = bool(set(filter(None, screen['operations'].split(';'))) & iot_ops)
+    has_iot = bool(set(filter(None, screen['operations'].split(';'))) & iot_ops) and screen['screen_id'] not in unit_names_only
     if has_iot and not device_states <= states:
         fail('IoT screen lacks device states '+screen['screen_id'])
     if not has_iot and states & device_states:

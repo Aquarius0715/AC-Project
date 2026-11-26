@@ -16,6 +16,14 @@ const fmt = (iso: string, locale: Locale) => new Date(iso).toLocaleString(intlTa
 
 // the days of a preset period; the month is the remaining preset
 const SPAN_DAYS = new Map<PeriodKind, number>([["today", 1], ["7d", 7]]);
+/** A custom from / to of the URL as an instant; an empty or unparsable value (a hand-edited link) counts as missing
+instead of throwing RangeError in klInstant and failing the whole page. */
+function urlInstant(local: string | undefined): string | undefined {
+  const v = filled(local);
+  if (v === undefined) return undefined;
+  const ms = Date.parse(`${v}:00+08:00`);
+  return Number.isNaN(ms) ? undefined : new Date(ms).toISOString();
+}
 export interface Period { kind: PeriodKind; from: string; to: string; label: string; days: number; error?: string }
 /** [from, to) of a period choice: whole Kuala Lumpur days up to the current minute of the business clock (today, the
 last 7 or 30 days), or the custom range (KL datetime-local values, at most 366 days, DD-C06). */
@@ -24,8 +32,8 @@ export function periodRange(kind: PeriodKind, now: Date, custom: { from?: string
   let from: string, to: string;
   if (kind === "custom") {
     const today = klLocal(now.toISOString()).slice(0, 10);
-    from = klInstant(filled(custom.from) ?? `${addDays(today, -6)}T00:00`);
-    to = custom.to ? klInstant(custom.to) : minute;
+    from = urlInstant(custom.from) ?? klInstant(`${addDays(today, -6)}T00:00`);
+    to = urlInstant(custom.to) ?? minute;
   } else {
     const days = SPAN_DAYS.get(kind) ?? 30;
     from = klInstant(`${addDays(klLocal(now.toISOString()).slice(0, 10), -(days - 1))}T00:00`);

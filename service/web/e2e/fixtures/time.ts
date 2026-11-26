@@ -7,7 +7,7 @@ type Names = Readonly<{ date: string; hour: string; minute: string }>;
 const ENGLISH: Names = { date: "Date", hour: "Hour", minute: "Minute" };
 
 /** A time of day, "HH:mm", in the hour and minute selects of `picker`. */
-async function pickTime(picker: Locator, value: string, names: Pick<Names, "hour" | "minute"> = ENGLISH): Promise<void> {
+export async function pickTime(picker: Locator, value: string, names: Pick<Names, "hour" | "minute"> = ENGLISH): Promise<void> {
   const [hour, minute] = value.split(":", 2);
   await picker.getByRole("combobox", { name: names.hour }).selectOption(must(hour, "an hour"));
   await picker.getByRole("combobox", { name: names.minute }).selectOption(must(minute, "a minute"));

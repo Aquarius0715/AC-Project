@@ -54,4 +54,13 @@ grep -q 'fake-bridgekey' "$work/docker/mosquitto/passwd" || fail "the committed 
 printf 'MQTT_DEVICE_SIM_KEY=other\nMQTT_IOT_BRIDGE_KEY=bridgekey\n' >"$work/keys.env"
 run
 grep -q 'fake-other' "$work/docker/mosquitto/passwd" || fail "a changed key was not written"
+
+# MOSQUITTO_PASSWD_DIR (the test environment's, outside the runner's checkout): the file and its stamp go there, and the
+# tree's file is left as it is
+before=$(cat "$work/docker/mosquitto/passwd")
+PATH="$work/bin:$PATH" ENV_FILE="$work/keys.env" MOSQUITTO_PASSWD_DIR="$work/outside" \
+  sh "$work/docker/mosquitto/passwd.sh" >/dev/null
+grep -q 'fake-other' "$work/outside/passwd" || fail "the file was not written into MOSQUITTO_PASSWD_DIR"
+[ -f "$work/outside/.passwd.keys" ] || fail "the stamp was not written beside the file in MOSQUITTO_PASSWD_DIR"
+[ "$(cat "$work/docker/mosquitto/passwd")" = "$before" ] || fail "MOSQUITTO_PASSWD_DIR changed the tree's file"
 echo "passwd.test: ok"

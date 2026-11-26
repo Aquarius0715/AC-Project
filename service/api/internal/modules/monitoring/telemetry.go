@@ -744,8 +744,8 @@ func (m Telemetry) readableUnits(ctx context.Context, call *ops.Call, units []uu
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR98 \
 //	@Description	allergenObservation source rows
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-C07, DD-T03, DD-A05, DD-A12, DD-C01 · Query: filters none · sort observedAt (default \
-//	@Description	observedAt asc;sensorId asc;id asc)
+//	@Description	Design: DD-C07, DD-T03, DD-C01 · Query: filters none · sort observedAt (default observedAt \
+//	@Description	asc;sensorId asc;id asc)
 //	@Tags			telemetry
 //	@Accept			json
 //	@Produce		json
@@ -961,7 +961,7 @@ func withAllergen(
 //	@Description	admin:dashboard.read | admin:automation.policy.read
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-P04, DD-T03
+//	@Description	Design:
 //	@Tags			telemetry
 //	@Accept			json
 //	@Produce		json

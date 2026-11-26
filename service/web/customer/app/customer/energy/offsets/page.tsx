@@ -1,14 +1,14 @@
 // /customer/energy/offsets (FR-C13, SCR-C13): in API mode a Server Component reads energy.summary for the selection
-// carried from Energy & cost (unitIds, period, from, to — the estimated emissions and savings) and the customer's
-// offsets.list. The demo quote is offsets.preview (writes no record) and the demo request offsets.simulate request
+// carried from Energy & cost (unitIds, period, from, to, baselineId — the estimated emissions and savings; the baseline
+// only when baselines.list has it for those units) and the customer's offsets.list. The demo quote is offsets.preview (writes no record) and the demo request offsets.simulate request
 // with the quote version and demoConfirmed; both are Server Actions. Nothing real is bought or retired. The Phase 1A
 // demo keeps the fixtures. Texts in the user's display language (IR265).
 import { connection } from "next/server";
 import { apiMode, coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
-import { summaryView, type ApiEnergySummary } from "@ac/web/lib/energy";
+import { summaryView, type ApiBaseline, type ApiEnergySummary } from "@ac/web/lib/energy";
 import type { ApiOffsetRecord } from "@ac/web/lib/offsets";
-import { periodKinds, periodRange, pickUnits, selectionQuery } from "@ac/web/lib/clientEnergy";
+import { baselinesFor, periodKinds, periodRange, pickUnits, selectionQuery } from "@ac/web/lib/clientEnergy";
 import { OffsetsDemo } from "./_components/offsets-demo";
 import { OffsetsView } from "./_components/offsets-view";
 import { queryReader } from "@ac/web/lib/searchParams";
@@ -20,15 +20,18 @@ export default async function CustomerOffsetsPage({ searchParams }: Readonly<Pag
   if (!apiMode()) return <OffsetsDemo />;
   const sp = await searchParams;
   const one = queryReader(sp);
-  const [now, units, records, display] = await Promise.all([
-    coreNow(), coreAll<{ id: string; displayName: string }>("units.list"), coreAll<ApiOffsetRecord>("offsets.list", { sort: { field: "createdAt", direction: "desc" } }), coreDisplay(),
+  const [now, units, baselines, records, display] = await Promise.all([
+    coreNow(), coreAll<{ id: string; displayName: string }>("units.list"), coreAll<ApiBaseline>("baselines.list"),
+    coreAll<ApiOffsetRecord>("offsets.list", { sort: { field: "createdAt", direction: "desc" } }), coreDisplay(),
   ]);
   const i = i18nOf(display);
   const unitIds = pickUnits(units, one("unitIds")); // the same default unit as Energy & cost
   const kind = periodKinds.find((k) => k === one("period")) ?? "7d";
   const period = periodRange(kind, now, { from: one("from"), to: one("to") }, i);
   let estimate: { emissions: string; savedEmissions: string; factor: string; comparable: boolean } | null = null;
-  const baselineId = one(BASELINEID) === "none" ? undefined : one(BASELINEID); // "none": No baseline on Energy & cost
+  // "none" is No baseline on Energy & cost; a baseline that is not among the customer's comparable ones for these units
+  // (deleted, or a stale link) is left out too, as Energy & cost does, rather than a NOT_FOUND failing the whole page
+  const baselineId = baselinesFor(baselines, unitIds).find((b) => b.id === one(BASELINEID))?.id;
   if (unitIds.length > 0 && !period.error) {
     try {
       const s = await coreOp<ApiEnergySummary>("energy.summary", { from: period.from, to: period.to, unitIds, ...(baselineId && { baselineId }) });

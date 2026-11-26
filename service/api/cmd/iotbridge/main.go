@@ -49,8 +49,8 @@ var (
 
 // The bridge's timings: httpTimeout bounds one API call, keepAlive is the MQTT keep-alive, disconnectWait how long (in
 // milliseconds) a disconnect waits for the work in flight, clockRefresh how often the scenario clock is read again,
-// commandPoll how often the requested commands are fetched, and liveCommandWait how long the nodes' broker has to
-// take a live command.
+// commandPoll how often the requested commands are fetched, liveCommandWait how long the nodes' broker has to take a
+// live command, and brokerRetry how long the bridge waits before it tries the stack's broker again.
 const (
 	httpTimeout     = 10 * time.Second
 	keepAlive       = 60 * time.Second
@@ -59,6 +59,7 @@ const (
 	commandPoll     = 2 * time.Second
 	liveCommandWait = 5 * time.Second
 	nodeRefresh     = 30 * time.Second
+	brokerRetry     = 30 * time.Second
 )
 
 // The bridge's workers and the places in each one's queue: 3,000 devices at 9 seconds are about 330 batches a second,
@@ -139,14 +140,16 @@ func run(broker, api, equipment, tenant string) error {
 	// the subscriptions are made on every connect: a clean session loses them when the broker restarts
 	opts := mqtt.NewClientOptions().AddBroker(broker).SetClientID("iot-bridge").
 		SetUsername(os.Getenv("MQTT_USER")).SetPassword(os.Getenv("MQTT_PASSWORD")).
-		SetAutoReconnect(true).SetConnectRetry(true).SetKeepAlive(keepAlive).
+		SetAutoReconnect(true).SetKeepAlive(keepAlive).
 		SetOnConnectHandler(func(c mqtt.Client) { subscribeDemo(ctx, c, work, resolver, clock, httpc, endpoint) }).
 		SetConnectionLostHandler(
 			func(_ mqtt.Client, err error) { log.Printf("broker %s: connection lost: %v", broker, err) })
 
 	client := mqtt.NewClient(opts)
-	if tok := client.Connect(); tok.Wait() && tok.Error() != nil {
-		return fmt.Errorf("connect %s: %w", broker, tok.Error())
+
+	err = connect(ctx, client, broker, brokerRetry)
+	if err != nil {
+		return err
 	}
 	defer client.Disconnect(disconnectWait)
 
@@ -345,6 +348,27 @@ func deviceKey(topic string) string {
 	}
 
 	return topic
+}
+
+// connect connects client to the stack's broker, and tries again every retry until ctx ends. Each refusal is logged
+// with its reason: with paho's own retry (SetConnectRetry) the first connect waits without a word, and a login the
+// broker refused (a password file not written from the environment's keys, 2026-11-24) kept the bridge waiting there
+// silently, before it reached the live broker.
+func connect(ctx context.Context, client mqtt.Client, broker string, retry time.Duration) error {
+	for {
+		tok := client.Connect()
+		if tok.Wait() && tok.Error() == nil {
+			return nil
+		}
+
+		log.Printf("broker %s: connect: %v; trying again in %s", broker, tok.Error(), retry)
+
+		select {
+		case <-ctx.Done():
+			return apperr.Wrap(ctx.Err(), "connect "+broker)
+		case <-time.After(retry):
+		}
+	}
 }
 
 // liveOptions are the live broker's client options: the nodes' login, a clean session with no will message, and the

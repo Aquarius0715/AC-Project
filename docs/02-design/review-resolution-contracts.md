@@ -11170,6 +11170,69 @@ The evidence text IR844 writes ("Device <serial> stopped reporting | lost power 
 4. **Accessibility on iOS 26.** The UI tests' audit leaves the contrast of text under the floating tab bar and the blur above it (40 pt) to when the text is scrolled above it, as for an element the screen's edge cuts off.
 5. **Tests.** Unit tests at 100 % of the lines and functions of each module: the tiles with and without jobs waiting or overdue, the alerts' filter and order, the reports of each state, the requests; the versions of a draft and of each review, singular counts, a photo read, refused or not an image, no report. The UI tests check the tiles and open the job from its alert, and the saved draft in the versions card. Opening a photo has no UI test: adding one needs the photo picker, which the UI tests do not drive.
 
+## IR876 A sign-in that finds another app's account asks for this app's password (IR385, IR790) — 2026-11-24
+
+1. **The fault.** The four apps' Keycloak clients are in one realm, so a browser has one single sign-on session for all of them. When an app's own session ended, its sign-in went straight on (IR790) and the single sign-on answered with whichever account had signed in last, to any app. If that was another app's account, the callback sent the person to `/login?error=role` ("This account belongs to another AC Project service"), and only "Sign in with another account" and the identity provider's change-account button got them in. This happened after every expired session for anyone who used two apps in one browser.
+2. **The fix.**
+   - The BFF callback no longer stops at another role's account on a plain sign-in. It ends that single sign-on session (back-channel logout with the sign-in's refresh token, as sign-out does, IR357) and starts the sign-in again with `prompt=login` (`reauth=1`). The identity provider then shows its e-mail and password form. Its own change-account button ends the other account's session in the same way.
+   - The role error stays for another role's account entered on that form (`reauth=1` already set), so there is no loop.
+   - A sign-in that succeeds keeps the account's e-mail address (the `email` claim) in a sealed, httpOnly cookie `ac_login_hint_<role>` on `/bff/auth`, for 30 days; sign-out keeps it. Every sign-in start sends it as `login_hint`, so the form is filled in with this app's last account. A single sign-on that is still open answers with its own account instead, as before.
+   - Consequence: signing in to one app with another account ends the other app's account at the identity provider, so that app asks for a sign-in once its access token needs refreshing. This was already so with the change-account button.
+3. **Tests.** `callbackRole.test.ts`: another role's account on a plain sign-in ends that session and asks for the password, back to `returnTo`; after `reauth` it is the role error; a sign-in remembers its e-mail address, and nothing without the claim. `loginRoute.test.ts`: `login_hint` from the cookie on a plain and a `reauth` start, none for a missing, altered or invalid cookie. E2E `session.e2e.ts` (four apps): with another app's account in the single sign-on, opening the app shows the password form with this app's e-mail address, not the role error.
+
+## IR877 The technician's alert says what to do on site (IR800) — 2026-11-24
+
+Found in the UI/UX loop (UX-73, the technician's "anomaly response" on a phone). tech-external-a opened "Possible open window" on Bedroom AC from the Overview. The alert evidence showed the evidence, the remeasurements and a reason box, but nothing said what to check on site. IR800 gave the customer a next step, and the technician had none. The resolution note also said "Resolve it with a reason below with “Resolve alerts”", while the button reads Resolve alert ("Resolve alerts" is the permission). "no policy" in the banner was a word from HQ's settings.
+
+1. **Next step.** `techAlertNext` (shared/lib/techAlerts.ts) gives the on-site step of an unresolved alert. An inspection record needs nothing. Otherwise the step goes by the cause first, then the type, and a fault comes last.
+   - window_open: check that the windows and doors are closed and that nothing blocks the airflow, and record it in the work report.
+   - insulation_loss: look for gaps around windows, doors and pipe openings, and note them in the work report.
+   - maintenance: clean the filter during the visit. quality: check the ventilation and the sensor, then take a new reading.
+   - tamper: check the cover and the restriction device. restriction_bypass: check that the restriction device has power and is in sight of the AC. reconciliation_required: nothing to do on site.
+   - Anything else is a fault: find the cause and record it in the work report.
+
+   A resolved alert has no step. The texts speak to the person at the AC, not to the room's user (IR800).
+2. **Screen.** The alert banner adds "What to do on site: …" under its title. The resolution note now depends on what the technician may do:
+   - with a policy and alert.resolve: it resolves once a remeasurement holds, or below with a reason;
+   - with a policy and without alert.resolve: a reason needs “Resolve alerts”;
+   - without a policy: a new reading does not resolve it, and once checked it is resolved below with a reason, or a user with “Resolve alerts” is asked.
+
+   The banner reads "{kind} · resolves only with a reason", without "no policy". DD-T07 says so.
+3. **Tests.** `techAlerts.test.ts` checks the step by cause, type and inspection, the fault fallback, no step once resolved, the Malay text, and the three resolution notes. `alertEvidence.test.tsx` checks the line is shown, and not for a resolved alert.
+
+## IR878 The Overview's alerts, billing and energy links keep the customer and property — 2026-11-25
+
+Found while writing the admin Overview tests (coverage loop round 3, PR #677). With a customer or property chosen, the KPIs count that scope (`admin.summary`). The links of three of them dropped it:
+- Unresolved alerts → `/admin/alerts?severity=attention`;
+- Overdue billing → `/admin/billing?overdueOnly=true`;
+- Energy → `/admin/energy`.
+
+A dispatcher who scoped the Overview to Demo Customer A, saw "Unresolved alerts 1" and opened it got every customer's alerts. DD-A01 step 7 and the Overview's own note ("The links keep the customer and property") say these links carry the scope. The alerts, billing and energy screens all read `customerId` and `propertyId`.
+
+1. **Links.** `overviewLinks` adds the scope to `alerts`, `billing` and `energy`, as it does for units and jobs. The period stays out of all three: alerts and unpaid invoices are current, and billing and energy take their periods as Kuala Lumpur months and local times, not the Overview's instants.
+   Energy's analysis tab took only the customer for its default unit set. With a property in the URL and no unit set or baseline, it now starts on that property's units, the ones the Overview's Energy KPI counts.
+2. **Docs.** DD-A01 step 7 lists the three links with their keys.
+3. **Tests.** `adminSummary.test.ts` checks the three links with no scope, a customer, and a customer and property with a period. `admin/tests/energyScope.test.ts` checks the analysis tab's default units for a customer and for a property.
+
+## IR879 The restriction exception screen names permissions by their labels (2026-11-16 decision) — 2026-11-25
+
+Found while writing the exception-screen tests (coverage loop round 6, PR #681). The user decided on 2026-11-16 that permission codes in texts become word labels, the ones Access & roles shows (`permissionLabel`, shared/lib/permissionLabels.ts). The exception screen still showed the codes in three places:
+- the Summary's "Your permissions" row read `restriction.write · restriction.override · audit.read`;
+- the Audit card's subtitle read `audit.read`;
+- the Override release card added `· restriction.override` after its operation name.
+
+1. **Screen.** "Your permissions" lists the held permissions with `permissionLabel` ("Edit restrictions · Override restrictions · View the audit log"), or "read only". The Audit card's subtitle is "View the audit log". The override card shows its operation name only, like the other three cards.
+2. **Search.** No other screen of the four apps shows a permission code as text (the demos aside).
+3. **Tests.** `admin/tests/exceptionPermissions.test.tsx` checks the labels, that no code is shown, and "read only".
+
+## IR880 Propose another time refuses the client's own times, compared as instants — 2026-11-25
+
+Found while writing the Jobs tab tests (coverage loop round 23, PR #700). An HQ proposal must be a time the client did not already offer; one of their own times is booked directly. The Propose another time dialog checked this, but it compared the times as text. The form writes an instant as `2026-09-22T02:00:00.000Z`; the Core API sends `2026-09-22T02:00:00Z` (Go `time.Time`). The two never matched, so the warning "This is one of the client’s own times — book it directly instead." never appeared, and Send proposal was not stopped.
+
+1. **Screen.** The dialog compares the start and end as instants (`Date.parse`), however each side writes them. One of the client's preferred times shows the warning, and Send proposal sends nothing.
+2. **Search.** No other screen of the four apps compares slot times as text.
+3. **Tests.** `admin/tests/jobsPropose.test.tsx` proposes the 1st preferred time, as the API writes it: the warning shows and nothing is sent. A time an hour shorter has no warning. The test fails on the old comparison.
+
 ## IR881 AC Customer: fewer taps — a change is sent once settled, one location switch, Settings tab (DEC-112) — 2026-11-26
 
 User 2026-11-26: the iOS apps should be simpler, with fewer buttons. This supersedes the confirmations of IR862 ② and the two-step consent of IR863 in the Customer app only; the web's customer unit page keeps its confirmation.
@@ -11177,3 +11240,12 @@ User 2026-11-26: the iOS apps should be simpler, with fewer buttons. This supers
 1. **The AC screen.** A change of the setpoint, the mode or the fan is sent 1.5 s after the last tap (a new tap starts the wait again, so a few taps of − go as one command), without the Review & send button and its confirmation; a line under the controls says what is about to be sent. The power switch sends at once, without its dialog. A confirmed send's line and its Undo stay 10 s and then go; a failure stays until the next send (the Dismiss button is gone), and the changes a refused send did not take wait under a Try again button. The command history is folded under its title; the explanations "Sent as its own command" and "Target: … only · you will confirm before sending" are gone, and the setpoint's range line says only its lowest and highest.
 2. **Settings tab.** The Location tab is Settings: the location card and Sign out, which leaves the bottom of the AC list. The location card has one switch, "Use this device's location": switching it on records the location consent first when it is not granted (a refused grant leaves it off) and then starts the reports; switching it off stops this phone's reports and keeps the consent. Withdraw consent shows only while the consent is granted and the switch is off, with its confirmation as before.
 3. **Tests.** Unit tests: the send once settled, a cancelled wait sending nothing, a refused send's changes waiting for Try again, the outcome going away (not a failure, not a newer outcome, not when cancelled); the switch granting the consent first, not asking it again when granted, a refused grant leaving it off, and off keeping it. UI tests: the temperature sent without a confirmation and undone, the power with one tap, the switch on the Settings tab, sign-out from it.
+
+## IR882 The documents follow the implementation (2026-11-24)
+
+Renumbered from IR860 at the merge of release/ios (the iOS foundation kept IR860).
+
+1. **The decision.** The user asked for no difference between `main`'s implementation and the documents and named the implementation as the source of truth: where they differed, the documents were changed, not the code. Figma stays as it is.
+2. **What changed.** The as-built text of the container, Go backend, architecture, database, network and load-test designs; the screen catalog's operations, queries, result contracts and URL keys, traced from each `page.tsx` through the imported functions; the role design tables and the operation catalog's design IDs; the component contracts' new `as_built` column; the UIUX tokens, navigation and breakpoints; the shared screens, the sign-in and the session (D04, D09, DDC-07, FR-X01); the READMEs; the edge behaviour of the review rounds R1082–R1137, which added no IR. The validators' fixed screen rules follow the same screens.
+3. **What did not.** The IR log keeps its history: an older IR describes the state of its day, and the newest IR on a topic applies (IR72). The Phase 1A acceptance cases (AT-*) keep their demo wording; each role's cases and the common ones carry an as-built note on what /demo offers in API mode, and a case whose expected result differs from the Core API says so.
+4. **Later rounds (2026-11-24).** The DD prose of the four roles and the common design now say how the screens behave as built — no query cache or subscriptions, the default sorts, the filters, the tabs (the technician's checklist group is not a URL key; HQ has the installation-requests and IoT-model tabs) — and the shared contracts (DDC-03 to DDC-08, D07, D10, UX-03) add the as-built handling of failures, files, events and the test environments. The write-version catalog, the query catalog's filters and sorts, the permission codes, the operation names and the routes named in the documents were checked against the code and match.

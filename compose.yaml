@@ -458,7 +458,7 @@ services:
     profiles: [infra, schema, backend, full]
 
   valkey:              # ElastiCache (sessions, idempotency fast path, rate limits)
-    image: valkey/valkey:9@sha256:3add1a336a920ea54770a001ab6feb3da5fceea96a40373a3a2cd469b815f0b7   # pinned by digest (IR373)
+    image: valkey/valkey:9@sha256:1c2b25b09f354c66fe994733acdf12fcfd4bdf6f3bd92b88a93a70378d884056   # pinned by digest (IR373)
     user: "999:999"                # the image's valkey user, not root (security loop, IR414)
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
@@ -479,18 +479,18 @@ services:
     profiles: [infra, backend, full]
 
   mosquitto:           # AWS IoT Core stand-in (MQTT 3.1.1/5); mutual TLS is verified in staging against IoT Core
-    image: eclipse-mosquitto:2@sha256:75d6662dee52c947dc9dd9c29f1d8d7ffef78ddaf38001caa09755681e8bbc98   # pinned by digest (IR373)
+    image: eclipse-mosquitto:2@sha256:fa12172a051310efe5bcb7a6a11b77bd5faacb82cbacd7742aa758bf024fd8e4   # pinned by digest (IR373)
     user: "1883:1883"              # the image's mosquitto user, not root (security loop, IR414)
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     ports: ["127.0.0.1:1883:1883"]   # this machine only: not reachable from other devices on the network (IR373)
-    volumes: [./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro, ./docker/mosquitto/passwd:/mosquitto/config/passwd:ro]
+    volumes: [./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro, "${MOSQUITTO_PASSWD_DIR:-./docker/mosquitto}/passwd:/mosquitto/config/passwd:ro"]   # the test environment's lies outside the checkout (deploy/test/deploy.sh)
     networks: [data]
     profiles: [infra, backend, full]
 
   mailpit:             # Amazon SES stand-in for development: catches every e-mail (SMTP 1025) and shows it at
                        # http://localhost:8025; nothing leaves the machine (IR418)
-    image: axllent/mailpit:v1.33.1@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce   # pinned (IR373)
+    image: axllent/mailpit:v1.34.0@sha256:23a2ef85bc50853ab3093645d1d64679afd8887e89da5e48a88940c172591a4e   # pinned (IR373)
     user: "1000:1000"              # not root (security loop, IR414)
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
@@ -550,7 +550,7 @@ services:
     profiles: [infra, backend, full]
 
   stripe-cli:
-    image: stripe/stripe-cli:v1.55.11@sha256:b72ef98b2c4e0d1ad81f7a0183c0506c63663fa3f8645226b954a9aca3046552   # pinned (IR373)
+    image: stripe/stripe-cli:v1.55.14@sha256:fec288f8c3e32a1a2425461f7d52cd6a35723358e87899617fd6a53ca555c3dc   # pinned (IR373)
     # through the gateway, as Stripe reaches it: the gateway passes /stripe to the billing service unchanged (IR827)
     # the events billing acts on (billing/stripe_events.go); this CLI version asks for them by name
     command: ["listen", "--forward-to", "http://gateway:8080/stripe", "--events", "checkout.session.completed,checkout.session.expired,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,payment_intent.succeeded,payment_intent.payment_failed", "--api-key", "${STRIPE_TEST_SECRET_KEY:-${STRIPE_SECRET_KEY:-}}"]
