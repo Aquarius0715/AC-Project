@@ -9,5 +9,7 @@ const shared = `${import.meta.dirname.replace(/\/$/, "")}/../shared`;
 export default defineConfig({
   plugins: [react()],
   resolve: { alias: { "@ac/web": shared } },
-  test: { environment: "node", include: ["tests/**/*.test.{ts,tsx}"], setupFiles: [`${shared}/lib/tests/setup-dom.ts`] },
+  // 30 s per test, as the shared package: a jsdom walk through a whole screen passes 5 s when check.sh runs every
+  // workspace's lint, typecheck and tests at the same time (partner usersDemo / usersLive did, 2026-11-25)
+  test: { environment: "node", include: ["tests/**/*.test.{ts,tsx}"], setupFiles: [`${shared}/lib/tests/setup-dom.ts`], testTimeout: 30_000 },
 });
