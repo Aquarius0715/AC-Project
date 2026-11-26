@@ -467,6 +467,44 @@ extension PresenceModelTests {
         #expect(model.line == "The request took too long — check whether the change was saved, then try again")
     }
 
+    @Test func theSwitchGrantsTheConsentFirstAndOffKeepsIt() async throws {
+        let location = ScriptedLocation()
+        let (model, transport) = model(
+            [try answer(consent(granted: false)), try answer(consent(granted: true, version: 5)), try properties, try result(nil)],
+            location: location
+        )
+        await model.loadConsent()
+        #expect(!model.isInUse)
+        await model.use(true)
+        #expect(model.isConsentGranted && model.isOn && model.isInUse)
+        let grant = try #require(await transport.requests.dropFirst().first)
+        #expect(grant.httpMethod == "PUT" && grant.httpBody == Data(#"{"granted":true}"#.utf8))
+        await model.use(false)
+        #expect(!model.isOn && !model.isInUse)
+        #expect(model.isConsentGranted, "switching off keeps the consent")
+        #expect(await transport.requests.count == 4, "nothing sent for the switch going off")
+    }
+
+    @Test func theSwitchWithTheConsentGrantedAsksNoConsent() async throws {
+        let (model, transport) = model([try answer(consent(granted: true)), try properties, try result(nil)])
+        await model.loadConsent()
+        await model.use(true)
+        #expect(model.isInUse)
+        #expect(await transport.requests.count == 3, "the read, the pins and the report: no consent update")
+    }
+
+    @Test func aRefusedGrantLeavesTheSwitchOff() async throws {
+        let conflict = StubTransport.Answer.http(
+            409,
+            #"{"code":"CONFLICT","messageKey":"error.versionConflict","fieldErrors":{},"correlationId":"c","retryAfterSeconds":null}"#
+        )
+        let (model, _) = model([try answer(consent(granted: false)), conflict])
+        await model.loadConsent()
+        await model.use(true)
+        #expect(!model.isOn && !model.isInUse)
+        #expect(model.line == "Someone changed this in the meantime — the screen now shows the latest version")
+    }
+
     @Test func refusedConsentChangeSaysWhy() async throws {
         let conflict = StubTransport.Answer.http(
             409,

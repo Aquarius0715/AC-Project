@@ -81,6 +81,51 @@ import Testing
         #expect(model.unit.value?.observedState.celsius == 26)
     }
 
+    @Test func changesAreSentOnceTheyHaveSettled() async throws {
+        let model = try await stubbed()
+        #expect(model.editCount == 0)
+        model.lower()
+        model.lower()
+        #expect(model.editCount == 2, "each tap starts the wait again")
+        await model.sendWhenSettled()
+        #expect(model.outcome?.text == "Living room AC: Set temperature 24°C — acknowledged by device")
+        #expect(model.changes.isEmpty)
+    }
+
+    @Test func aChangeMeanwhileCancelsTheSend() async throws {
+        let model = try await stubbed()
+        model.lower()
+        let waiting = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            await model.sendWhenSettled()
+        }
+        await waiting.value
+        #expect(model.outcome == nil, "a cancelled wait sends nothing")
+        #expect(model.changes == [.setTemperature(UnitActionSetTemperature(celsius: 25))])
+    }
+
+    @Test func aConfirmedOutcomeGoesAwayAndAFailureStays() async throws {
+        let model = try await stubbed()
+        let ok = UnitControlModel.Outcome(text: "ok", isOk: true, undo: [])
+        model.outcome = ok
+        await model.dismissWhenSeen(ok)
+        #expect(model.outcome == nil)
+        let failed = UnitControlModel.Outcome(text: "failed", isOk: false, undo: [])
+        model.outcome = failed
+        await model.dismissWhenSeen(failed)
+        #expect(model.outcome == failed)
+        let later = UnitControlModel.Outcome(text: "later", isOk: true, undo: [])
+        model.outcome = later
+        await model.dismissWhenSeen(ok)
+        #expect(model.outcome == later, "a newer outcome is not taken away by the older one's wait")
+        let cancelled = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            await model.dismissWhenSeen(later)
+        }
+        await cancelled.value
+        #expect(model.outcome == later, "a cancelled wait leaves it")
+    }
+
     @Test func powerIsSentOnItsOwn() async throws {
         let model = try await stubbed()
         await model.sendPower(false)

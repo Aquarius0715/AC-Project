@@ -30,6 +30,7 @@ final class CustomerUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Offline"].exists)
         try app.audit()
         keepScreenshot("units", of: app)
+        app.tabBars.buttons["Settings"].firstMatch.tap()
         app.buttons["signOut"].tap()
         XCTAssertTrue(app.buttons["signIn.button"].waitForExistence(timeout: 5))
     }
@@ -47,20 +48,16 @@ final class CustomerUITests: XCTestCase {
     }
 
     @MainActor
-    func testATemperatureIsReviewedSentConfirmedAndUndone() throws {
+    func testATemperatureIsSentOnceSettledAndUndone() throws {
         let app = openLivingRoom()
         XCTAssertEqual(app.staticTexts["temperature.value"].label, "26°C")
-        XCTAssertFalse(app.buttons["review.send"].exists, "nothing to send before a change")
+        XCTAssertFalse(app.staticTexts["pending"].exists, "nothing to send before a change")
         try app.audit()
         keepScreenshot("unit-control", of: app)
         app.buttons["temperature.lower"].tap()
         app.buttons["temperature.lower"].tap()
         XCTAssertEqual(app.staticTexts["temperature.value"].label, "24°C")
-        XCTAssertEqual(app.staticTexts["review.summary"].label, "1 change: Set temperature 26°C → 24°C")
-        tapScrolling(app.buttons["review.send"], in: app)
-        let send = app.alerts.buttons["send.confirm"].firstMatch  // iOS 26 shows an alert button as two elements
-        XCTAssertTrue(send.waitForExistence(timeout: 5))
-        send.tap()
+        // the two taps go as one command, without a confirmation
         let outcome = app.staticTexts["outcome"]
         XCTAssertTrue(outcome.waitForExistence(timeout: 15))
         XCTAssertEqual(outcome.label, "Living room AC: Set temperature 24°C — acknowledged by device")
@@ -88,15 +85,11 @@ final class CustomerUITests: XCTestCase {
     }
 
     @MainActor
-    func testThePowerIsSentAfterItsConfirmation() {
+    func testThePowerIsSentWithOneTap() {
         let app = openLivingRoom()
         let power = app.switches["power"]
         XCTAssertEqual(power.value as? String, "1")
         power.switches.firstMatch.tap()
-        let confirm = app.buttons["power.confirm"].firstMatch  // iOS 26 shows a dialog button as two elements
-        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
-        XCTAssertEqual(confirm.label, "Power OFF")
-        confirm.tap()
         XCTAssertTrue(wait(for: app.staticTexts["outcome"], label: "Living room AC: Set power OFF — acknowledged by device"))
         XCTAssertEqual(app.switches["power"].value as? String, "0")
     }
@@ -122,16 +115,13 @@ final class CustomerUITests: XCTestCase {
     func testHomeOrAwayIsReportedOnceSwitchedOn() throws {
         let app = launch(["AC_UI_TEST": "stub"])
         app.buttons["signIn.button"].tap()
-        app.tabBars.buttons["Location"].firstMatch.tap()
-        let grant = app.buttons["consent.grant"]
-        XCTAssertTrue(grant.waitForExistence(timeout: 5), "the switch needs the location consent first")
-        XCTAssertFalse(app.switches["presence.switch"].exists)
-        try app.audit()
-        grant.tap()
+        app.tabBars.buttons["Settings"].firstMatch.tap()
         let toggle = app.switches["presence.switch"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
         XCTAssertEqual(toggle.value as? String, "0")
+        XCTAssertFalse(app.buttons["consent.withdraw"].exists, "nothing to withdraw before the consent")
         try app.audit()
+        // one switch: it records the consent and starts the reports
         toggle.switches.firstMatch.tap()
         XCTAssertTrue(wait(for: app.staticTexts["presence.line"], label: "Arrived at Home A — 1 automation ran."))
         keepScreenshot("presence", of: app)
@@ -164,7 +154,7 @@ final class CustomerUITests: XCTestCase {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["AC_UI_LIVE"] == "1", "the dev stack's live test (TEST_RUNNER_AC_UI_LIVE=1)")
         let app = launch([:])
         // (the list may be long: its last row, Sign out, is loaded once scrolled to)
-        if app.navigationBars["Air conditioners"].waitForExistence(timeout: 3) { tapScrolling(app.buttons["signOut"], in: app) }
+        if app.navigationBars["Air conditioners"].waitForExistence(timeout: 3) { signOut(app) }
         XCTAssertTrue(app.buttons["signIn.button"].waitForExistence(timeout: 10))
         app.buttons["signIn.button"].tap()
         LiveSignIn.signIn(user: "customer-a")
@@ -178,14 +168,12 @@ final class CustomerUITests: XCTestCase {
     func testLivePresenceIsReportedToTheDevStack() throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["AC_UI_LIVE_PRESENCE"] == "1", "needs a pin and the simulator's location set")
         let app = try liveSignedIn()
-        app.tabBars.buttons["Location"].firstMatch.tap()
-        // the account's consent as it was: granted for the run, withdrawn again after it when it was not
-        let grant = app.buttons["consent.grant"]
-        let wasGranted = !grant.waitForExistence(timeout: 10)
-        if !wasGranted { grant.tap() }
+        app.tabBars.buttons["Settings"].firstMatch.tap()
         let toggle = app.switches["presence.switch"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 10))
         if toggle.value as? String == "1" { toggle.switches.firstMatch.tap() }
+        // the account's consent as it was: granted by the switch for the run, withdrawn again after it when it was not
+        let wasGranted = app.buttons["consent.withdraw"].waitForExistence(timeout: 5)
         toggle.switches.firstMatch.tap()
         let line = app.staticTexts["presence.line"]
         XCTAssertTrue(line.waitForExistence(timeout: 30))
@@ -199,8 +187,15 @@ final class CustomerUITests: XCTestCase {
         if !wasGranted {
             app.buttons["consent.withdraw"].tap()
             app.buttons["consent.withdraw.confirm"].firstMatch.tap()
-            XCTAssertTrue(app.buttons["consent.grant"].waitForExistence(timeout: 10))
+            XCTAssertTrue(app.buttons["consent.withdraw"].waitForNonExistence(timeout: 10))
         }
+    }
+
+    /// Signs out from the Settings tab.
+    @MainActor
+    private func signOut(_ app: XCUIApplication) {
+        app.tabBars.buttons["Settings"].firstMatch.tap()
+        tapScrolling(app.buttons["signOut"], in: app)
     }
 
     @MainActor
@@ -209,7 +204,7 @@ final class CustomerUITests: XCTestCase {
         let app = launch([:])
         // a session a run before kept in the Keychain: signed out first, so the sign-in is this run's
         // (the list may be long: its last row, Sign out, is loaded once scrolled to)
-        if app.navigationBars["Air conditioners"].waitForExistence(timeout: 3) { tapScrolling(app.buttons["signOut"], in: app) }
+        if app.navigationBars["Air conditioners"].waitForExistence(timeout: 3) { signOut(app) }
         XCTAssertTrue(app.buttons["signIn.button"].waitForExistence(timeout: 10))
         app.buttons["signIn.button"].tap()
         LiveSignIn.signIn(user: "customer-a")
@@ -224,7 +219,7 @@ final class CustomerUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["REMOTE CONTROL"].waitForExistence(timeout: 20))
         keepScreenshot("live-unit", of: app)
         app.navigationBars.buttons.firstMatch.tap()
-        tapScrolling(app.buttons["signOut"], in: app)
+        signOut(app)
         XCTAssertTrue(app.buttons["signIn.button"].waitForExistence(timeout: 10))
     }
 }

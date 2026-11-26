@@ -1,7 +1,7 @@
 import ACShared
 import SwiftUI
 
-/// The Customer app (DEC-112): the sign-in, then the customer's ACs, notifications and home-or-away location.
+/// The Customer app (DEC-112): the sign-in, then the customer's ACs, notifications and settings (home-or-away, sign-out).
 public struct CustomerRoot: View {
     let session: SessionModel
     let presence: PresenceModel
@@ -27,8 +27,8 @@ public struct CustomerRoot: View {
                     .tabItem { Label(tr("Air conditioners"), systemImage: "air.conditioner.horizontal") }
                 NotificationsView(model: NotificationsModel(client: session.client))
                     .tabItem { Label(tr("Notifications"), systemImage: "bell") }
-                PresenceView(model: presence)
-                    .tabItem { Label(tr("Location"), systemImage: "location") }
+                PresenceView(model: presence) { await session.signOut() }
+                    .tabItem { Label(tr("Settings"), systemImage: "gearshape") }
             }
             .task {
                 await session.applyPreferences()
@@ -72,9 +72,6 @@ struct UnitsView: View {
                 }
                 if case .loaded([]) = model.units {
                     Text(verbatim: tr("No ACs in your account yet."))
-                }
-                Section {
-                    Button(tr("Sign out")) { Task { await session.signOut() } }.accessibilityIdentifier("signOut")
                 }
             }
             .overlay { if case .loading = model.units { ProgressView() } }

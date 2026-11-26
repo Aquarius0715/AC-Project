@@ -714,25 +714,25 @@
         }
       }
     },
-    "{min}–{max}°C · step {step}°C · confirmed {confirmed}°C": {
+    "{min}–{max}°C": {
       "extractionState": "manual",
       "localizations": {
         "ms": {
           "stringUnit": {
             "state": "translated",
-            "value": "{min}–{max}°C · langkah {step}°C · disahkan {confirmed}°C"
+            "value": "{min}–{max}°C"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "{min}～{max}°C · {step}°C 刻み · 確認済み {confirmed}°C"
+            "value": "{min}–{max}°C"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "{min}–{max}°C · langkah {step}°C · terkonfirmasi {confirmed}°C"
+            "value": "{min}–{max}°C"
           }
         }
       }
@@ -756,52 +756,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "{n} peringatan"
-          }
-        }
-      }
-    },
-    "{n} change:": {
-      "extractionState": "manual",
-      "localizations": {
-        "ms": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "{n} perubahan:"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "{n} 件の変更:"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "{n} perubahan:"
-          }
-        }
-      }
-    },
-    "{n} changes:": {
-      "extractionState": "manual",
-      "localizations": {
-        "ms": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "{n} perubahan:"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "{n} 件の変更:"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "{n} perubahan:"
           }
         }
       }
@@ -5084,29 +5038,6 @@
         }
       }
     },
-    "Confirm command": {
-      "extractionState": "manual",
-      "localizations": {
-        "ms": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sahkan arahan"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "コマンドの確認"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Konfirmasi perintah"
-          }
-        }
-      }
-    },
     "Confirm that the installed model is the registered one": {
       "extractionState": "manual",
       "localizations": {
@@ -6575,29 +6506,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diagnostik"
-          }
-        }
-      }
-    },
-    "Dismiss": {
-      "extractionState": "manual",
-      "localizations": {
-        "ms": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tutup"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "閉じる"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tutup"
           }
         }
       }
@@ -8097,29 +8005,6 @@
         }
       }
     },
-    "Grant consent": {
-      "extractionState": "manual",
-      "localizations": {
-        "ms": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Berikan persetujuan"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "同意を付与"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Berikan persetujuan"
-          }
-        }
-      }
-    },
     "heartbeat confirmed": {
       "extractionState": "manual",
       "localizations": {
@@ -9220,29 +9105,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Otomatisasi lokasi memerlukan persetujuan Anda. Ini hanya dipakai untuk otomatisasi tiba/pergi: lokasi perangkat Anda dibandingkan dengan pin peta rumah dan kantor Anda, dan hanya di rumah atau pergi yang disimpan."
-          }
-        }
-      }
-    },
-    "Location consent — for arrival/departure automations only": {
-      "extractionState": "manual",
-      "localizations": {
-        "ms": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Persetujuan lokasi — untuk automasi tiba/pergi sahaja"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "位置情報の同意 — 到着・外出の自動化のみ"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Persetujuan lokasi — hanya untuk otomasi tiba/pergi"
           }
         }
       }
@@ -12210,29 +12072,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Online"
-          }
-        }
-      }
-    },
-    "Only {name} changes. The result shows after the device acknowledges.": {
-      "extractionState": "manual",
-      "localizations": {
-        "ms": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hanya {name} berubah. Keputusan dipaparkan selepas peranti mengesahkan."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "変更されるのは {name} のみです。結果はデバイスが受け付けたあとに表示されます。"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hanya {name} yang berubah. Hasil ditampilkan setelah perangkat mengonfirmasi."
           }
         }
       }
@@ -15756,29 +15595,6 @@
         }
       }
     },
-    "Send to {name}": {
-      "extractionState": "manual",
-      "localizations": {
-        "ms": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hantar ke {name}"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "{name} に送信"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Kirim ke {name}"
-          }
-        }
-      }
-    },
     "Send to coordinator": {
       "extractionState": "manual",
       "localizations": {
@@ -15798,6 +15614,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Kirim ke koordinator"
+          }
+        }
+      }
+    },
+    "Sending: {changes}": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menghantar: {changes}"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "送信します：{changes}"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mengirim: {changes}"
           }
         }
       }
@@ -15890,29 +15729,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sensor ({n}) · dari model IoT"
-          }
-        }
-      }
-    },
-    "Sent as its own command": {
-      "extractionState": "manual",
-      "localizations": {
-        "ms": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dihantar sebagai arahan tersendiri"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "単独のコマンドとして送信されます"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dikirim sebagai perintah tersendiri"
           }
         }
       }
@@ -16212,6 +16028,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Titik setel"
+          }
+        }
+      }
+    },
+    "Settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tetapan"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pengaturan"
           }
         }
       }
@@ -17067,6 +16906,29 @@
         }
       }
     },
+    "Switching this on gives your location consent, for arrival/departure automations only.": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menghidupkan ini memberi persetujuan lokasi anda, hanya untuk automasi ketibaan/keluar."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オンにすると、位置情報の利用に同意したことになります（到着・出発の自動化にのみ使用）。"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mengaktifkan ini memberikan persetujuan lokasi Anda, hanya untuk otomatisasi tiba/pergi."
+          }
+        }
+      }
+    },
     "Take photo": {
       "extractionState": "manual",
       "localizations": {
@@ -17178,29 +17040,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tidak ada perusakan"
-          }
-        }
-      }
-    },
-    "Target: {name} only · you will confirm before sending": {
-      "extractionState": "manual",
-      "localizations": {
-        "ms": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sasaran: {name} sahaja · anda akan mengesahkan sebelum menghantar"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "対象: {name} のみ · 送信前に確認します"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Target: hanya {name} · Anda akan mengonfirmasi sebelum mengirim"
           }
         }
       }
@@ -20103,48 +19942,25 @@
         }
       }
     },
-    "Turn this AC off?": {
+    "Try again": {
       "extractionState": "manual",
       "localizations": {
         "ms": {
           "stringUnit": {
             "state": "translated",
-            "value": "Matikan AC ini?"
+            "value": "Cuba lagi"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "このエアコンの電源をオフにしますか？"
+            "value": "再試行"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Matikan AC ini?"
-          }
-        }
-      }
-    },
-    "Turn this AC on?": {
-      "extractionState": "manual",
-      "localizations": {
-        "ms": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hidupkan AC ini?"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "このエアコンの電源をオンにしますか？"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nyalakan AC ini?"
+            "value": "Coba lagi"
           }
         }
       }

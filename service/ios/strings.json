@@ -4,6 +4,11 @@
     "ja": "{field}：{n} 文字までです",
     "ms": "{field}: paling banyak {n} aksara"
   },
+  "{min}–{max}°C": {
+    "id": "{min}–{max}°C",
+    "ja": "{min}–{max}°C",
+    "ms": "{min}–{max}°C"
+  },
   "Allow location “Always” so that arriving and leaving are reported while the app is closed.": {
     "id": "Izinkan lokasi “Selalu” agar tiba dan pergi dilaporkan saat aplikasi ditutup.",
     "ja": "アプリを閉じている間も到着と出発を報告するには、位置情報を「常に」許可してください。",
@@ -33,6 +38,21 @@
     "id": "Buka laporan kerja",
     "ja": "作業報告を開く",
     "ms": "Buka laporan kerja"
+  },
+  "Sending: {changes}": {
+    "id": "Mengirim: {changes}",
+    "ja": "送信します：{changes}",
+    "ms": "Menghantar: {changes}"
+  },
+  "Settings": {
+    "id": "Pengaturan",
+    "ja": "設定",
+    "ms": "Tetapan"
+  },
+  "Switching this on gives your location consent, for arrival/departure automations only.": {
+    "id": "Mengaktifkan ini memberikan persetujuan lokasi Anda, hanya untuk otomatisasi tiba/pergi.",
+    "ja": "オンにすると、位置情報の利用に同意したことになります（到着・出発の自動化にのみ使用）。",
+    "ms": "Menghidupkan ini memberi persetujuan lokasi anda, hanya untuk automasi ketibaan/keluar."
   },
   "Take photo": {
     "id": "Ambil foto",

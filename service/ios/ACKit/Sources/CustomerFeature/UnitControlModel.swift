@@ -5,8 +5,9 @@ import Observation
 
 /// One AC and its remote control (FR-C03, the web's customer unit page): the confirmed setting, the setting the customer
 /// is choosing, and the sends. Only the settings the customer changed and the AC does not already have are sent, one
-/// command each, each followed until the AC answers or the command expires (D04); the power is sent on its own after a
-/// confirmation. A fully confirmed send offers its undo (IR810).
+/// command each, each followed until the AC answers or the command expires (D04); the power is sent on its own. A
+/// change is sent once the customer stops changing for a moment, without a confirmation: a fully confirmed send offers
+/// its undo instead (IR810).
 @MainActor @Observable
 public final class UnitControlModel {
     /// What the last send came to: its line, whether the AC took it, and the commands that put it back.
@@ -49,6 +50,10 @@ public final class UnitControlModel {
     /// again for each command.
     public private(set) var waiting: Waiting?
     public var outcome: Outcome?
+    /// Counts the customer's changes: each one starts the wait before the send again (the screen's task is keyed by it).
+    public private(set) var editCount = 0
+    /// True from a change until its wait is over: the changes are on their way, not left behind by a failed send.
+    public private(set) var isSettling = false
 
     let client: CoreClient
     let me: String?
@@ -65,6 +70,8 @@ public final class UnitControlModel {
     static let polls = 25
     /// A cooling setpoint below this is worth a second look (IR808).
     static let coolHintBelow = 22.0
+    /// The pause after the last change before it is sent: a few taps of + or − go as one command.
+    static let settleDelay = Duration.milliseconds(1500)
 
     /// - Parameters:
     ///   - me: the signed-in membership, so a command sent by hand says "by you" or "by someone else" (IR804).
@@ -173,17 +180,28 @@ public final class UnitControlModel {
         guard value >= minimum, value <= maximum else { return }
         setpoint = value
         edited.insert(.temperature)
+        changed()
     }
 
     public func choose(mode value: Mode) {
         mode = value
         edited.insert(.mode)
+        changed()
     }
 
     public func choose(fan value: Fan) {
         fan = value
         edited.insert(.fan)
+        changed()
     }
+
+    private func changed() {
+        editCount += 1
+        isSettling = true
+    }
+
+    /// Changes a send did not take (it was refused, or the AC did not answer): they wait for "Try again".
+    public var isLeftBehind: Bool { !changes.isEmpty && !isSettling && !isSending && !isDisabled }
 
     /// The settings the customer changed that the AC does not have yet, in the order they are sent, with their words
     /// ("Set temperature 26°C → 24°C").
@@ -233,7 +251,28 @@ public final class UnitControlModel {
         await send(changes, isUndo: false)
     }
 
-    /// Sends the power on its own (after the screen's confirmation).
+    /// Sends the changes once the customer has stopped changing for a moment; a change meanwhile cancels the task
+    /// (the screen starts a new one), so only the last setting is sent.
+    public func sendWhenSettled() async {
+        await pause(Self.settleDelay)
+        // a cancelled wait is followed by the next change's, which clears the flag
+        guard !Task.isCancelled else { return }
+        isSettling = false
+        await sendChanges()
+    }
+
+    /// The last send's outcome goes away after a while when the AC took it (its undo with it); a failure stays.
+    public func dismissWhenSeen(_ shown: Outcome) async {
+        guard shown.isOk else { return }
+        await pause(Self.outcomeSeconds)
+        guard !Task.isCancelled, outcome == shown else { return }
+        outcome = nil
+    }
+
+    /// How long a confirmed send's line and its undo stay.
+    static let outcomeSeconds = Duration.seconds(10)
+
+    /// Sends the power on its own.
     public func sendPower(_ on: Bool) async {
         await send([.setPower(UnitActionSetPower(power: on))], isUndo: false)
     }

@@ -3,13 +3,10 @@ import ACShared
 import SwiftUI
 
 /// One AC: its readings and confirmed setting, the remote control and the command history (the web's customer unit
-/// page, FR-C03). Nothing is sent without a confirmation; the result shows once the AC answers.
+/// page, FR-C03). A change is sent a moment after the last tap, without a confirmation; the result shows once the AC
+/// answers, with its undo.
 struct UnitDetailView: View {
     @State private var model: UnitControlModel
-    /// The power the customer switched to, waiting for the confirmation.
-    @State private var isAskingPower = false
-    @State private var askedPower = false
-    @State private var isConfirming = false
 
     init(model: UnitControlModel) {
         _model = State(initialValue: model)
@@ -35,31 +32,9 @@ struct UnitDetailView: View {
         .refreshable { await model.load() }
         .task { await model.load() }
         .task { await refreshWhileShown() }
-        .confirmationDialog(
-            Text(verbatim: askedPower ? tr("Turn this AC on?") : tr("Turn this AC off?")),
-            isPresented: $isAskingPower,
-            titleVisibility: .visible
-        ) {
-            if isAskingPower {
-                Button(askedPower ? tr("Power ON") : tr("Power OFF")) { Task { await model.sendPower(askedPower) } }
-                    .accessibilityIdentifier("power.confirm")
-            }
-            Button(tr("Cancel"), role: .cancel) { isAskingPower = false }
-        }
-        .alert(Text(verbatim: tr("Confirm command")), isPresented: $isConfirming) {
-            Button(tr("Cancel"), role: .cancel) { isConfirming = false }
-            Button(tr("Send to {name}", ["name": model.unit.value?.displayName ?? ""])) { Task { await model.sendChanges() } }
-                .accessibilityIdentifier("send.confirm")
-        } message: {
-            Text(verbatim: confirmMessage)
-        }
-    }
-
-    /// What the confirmation says: the changes, and that only this AC changes once it answers.
-    private var confirmMessage: String {
-        let name = model.unit.value?.displayName ?? ""
-        let only = tr("Only {name} changes. The result shows after the device acknowledges.", ["name": name])
-        return "\(model.changeSummary)\n\(only)"
+        // each change starts the wait again; the last one is sent
+        .task(id: model.editCount) { if model.editCount > 0 { await model.sendWhenSettled() } }
+        .task(id: model.outcome) { if let shown = model.outcome { await model.dismissWhenSeen(shown) } }
     }
 
     /// Others' changes (another user, an automation, the AC itself) appear without a reload, as on the web (IR809), and
@@ -67,7 +42,7 @@ struct UnitDetailView: View {
     private func refreshWhileShown() async {
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(30))
-            if !Task.isCancelled, !model.isSending, !isAskingPower, !isConfirming, model.changes.isEmpty { await model.load() }
+            if !Task.isCancelled, !model.isSending, model.changes.isEmpty { await model.load() }
         }
     }
 
@@ -135,7 +110,7 @@ struct UnitDetailView: View {
                 // the wait and the result first: a send's answer is seen where the customer looks, not below the fold
                 state
                 power
-                if let range = model.layout.temperature { temperature(range, unit) }
+                if let range = model.layout.temperature { temperature(range) }
                 if !model.layout.modes.isEmpty {
                     let mode = Binding(get: { model.mode }, set: { model.choose(mode: $0) })
                     choice(tr("Mode"), id: "mode", options: model.layout.modes, selection: mode, words: Words.mode)
@@ -144,7 +119,7 @@ struct UnitDetailView: View {
                     let fan = Binding(get: { model.fan }, set: { model.choose(fan: $0) })
                     choice(tr("Fan speed"), id: "fan", options: model.layout.fans, selection: fan, words: Words.fan)
                 }
-                review(unit)
+                pending
             } else {
                 Text(
                     verbatim: tr(
@@ -176,28 +151,20 @@ struct UnitDetailView: View {
 
     private var power: some View {
         Toggle(
-            isOn: Binding(
-                get: { model.isOn },
-                set: { power in
-                    askedPower = power
-                    isAskingPower = true
-                }
-            )
+            isOn: Binding(get: { model.isOn }, set: { power in Task { await model.sendPower(power) } })
         ) {
             VStack(alignment: .leading) {
                 Text(verbatim: tr("Power"))
-                Text(
-                    verbatim: model.isPowerUnknown
-                        ? tr("Current power unknown · switching sends that command") : tr("Sent as its own command")
-                )
-                .font(.footnote)
+                if model.isPowerUnknown {
+                    Text(verbatim: tr("Current power unknown · switching sends that command")).font(.footnote)
+                }
             }
         }
         .disabled(model.isPowerLocked)
         .accessibilityIdentifier("power")
     }
 
-    private func temperature(_ range: CapabilityTemperature, _ unit: UnitDetail) -> some View {
+    private func temperature(_ range: CapabilityTemperature) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(verbatim: tr("Set temperature"))
             HStack {
@@ -224,17 +191,9 @@ struct UnitDetailView: View {
                 .accessibilityLabel(Text(verbatim: tr("Raise the temperature")))
                 .accessibilityIdentifier("temperature.raise")
             }
-            Text(
-                verbatim: tr(
-                    "{min}–{max}°C · step {step}°C · confirmed {confirmed}°C",
-                    [
-                        "min": Words.celsius(model.minimum), "max": Words.celsius(range.max), "step": Words.celsius(range.step),
-                        "confirmed": unit.observedState.celsius.map(Words.celsius) ?? "—",
-                    ]
-                )
-            )
-            .font(.footnote)
-            .fixedSize(horizontal: false, vertical: true)
+            Text(verbatim: tr("{min}–{max}°C", ["min": Words.celsius(model.minimum), "max": Words.celsius(range.max)]))
+                .font(.footnote)
+                .fixedSize(horizontal: false, vertical: true)
             if let hint = model.coolingHint {
                 Label {
                     Text(verbatim: hint)
@@ -245,21 +204,22 @@ struct UnitDetailView: View {
         }
     }
 
-    private func review(_ unit: UnitDetail) -> some View {
-        let count = model.changes.count
-        return VStack(alignment: .leading, spacing: 8) {
-            Text(
-                verbatim: "\(count == 1 ? tr("{n} change:", ["n": "1"]) : tr("{n} changes:", ["n": String(count)])) \(model.changeSummary)"
-            )
-            .accessibilityIdentifier("review.summary")
-            Text(verbatim: tr("Target: {name} only · you will confirm before sending", ["name": unit.displayName])).font(.footnote)
-            // only a change there is to send has its button: a greyed-out button is below the contrast the audit asks
-            // for, and the line above already says there is no change (the wait shows below while sending)
-            if count > 0, !model.isDisabled, !model.isSending {
-                Button(tr("Review & send")) { isConfirming = true }
-                    .buttonStyle(.borderedProminent)
-                    .accessibilityIdentifier("review.send")
+    /// The changes about to be sent, while the customer may still change them (they go a moment after the last tap), or
+    /// the retry of changes a send did not take.
+    @ViewBuilder private var pending: some View {
+        if model.isSettling, !model.changes.isEmpty, !model.isDisabled, !model.isSending {
+            Label {
+                Text(verbatim: tr("Sending: {changes}", ["changes": model.changeSummary]))
+            } icon: {
+                Image(systemName: "paperplane")
             }
+            .font(.footnote)
+            .accessibilityIdentifier("pending")
+        } else if model.isLeftBehind {
+            // a send that was refused leaves its changes: they go again only when asked
+            Button(tr("Try again")) { Task { await model.sendChanges() } }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("retry")
         }
     }
 
@@ -275,11 +235,8 @@ struct UnitDetailView: View {
                     Image(systemName: outcome.isOk ? "checkmark.circle" : "exclamationmark.triangle")
                 }
                 .accessibilityIdentifier("outcome")
-                HStack {
-                    if !outcome.undo.isEmpty {
-                        Button(tr("Undo")) { Task { await model.undo() } }.secondaryAction().accessibilityIdentifier("outcome.undo")
-                    }
-                    Button(tr("Dismiss")) { model.outcome = nil }.secondaryAction()
+                if !outcome.undo.isEmpty {
+                    Button(tr("Undo")) { Task { await model.undo() } }.secondaryAction().accessibilityIdentifier("outcome.undo")
                 }
             }
         }
@@ -288,8 +245,20 @@ struct UnitDetailView: View {
         }
     }
 
+    /// The history, folded away: most visits only change the setting.
     @ViewBuilder private var history: some View {
-        Card(tr("Command history")) {
+        Card {
+            DisclosureGroup {
+                historyRows
+            } label: {
+                Text(verbatim: tr("Command history"))
+            }
+            .accessibilityIdentifier("history")
+        }
+    }
+
+    @ViewBuilder private var historyRows: some View {
+        VStack(alignment: .leading, spacing: 8) {
             if model.historyRows.isEmpty {
                 Text(verbatim: tr("No commands for this AC yet"))
             }
