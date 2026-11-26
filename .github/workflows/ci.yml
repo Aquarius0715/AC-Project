@@ -1,7 +1,7 @@
 # Lint and tests of the whole repository on every push and pull request. Each check is its own job: Go lint (format, vet,
 # golangci-lint, generated files and the API description), the Go suite (unit + integration on one server), the integration suite
-# against the split services, the web lint (type-aware, no warnings allowed) per workspace, web dead code (knip), Python, shell, workflows and Dockerfiles, web typecheck, web unit tests, the iOS apps (on a GitHub-hosted Mac), and the design document validators. The
-# end-to-end suite needs the whole compose stack and runs in e2e.yml.
+# against the split services, the web lint (type-aware, no warnings allowed) per workspace, web dead code (knip), Python, shell, workflows and Dockerfiles, web typecheck, web unit tests, the iOS lint and unit tests (on a GitHub-hosted Mac), and the design document validators. The
+# end-to-end suite needs the whole compose stack and runs in e2e.yml; the iOS apps' UI tests run in ios-ui.yml.
 #
 # The jobs run on GitHub-hosted runners (ubuntu-latest, IR732), each in a container of its own (golang, node, python), so
 # the toolchains are the ones the development stack uses. No pull request job runs on the lab server: a pull request from
@@ -289,11 +289,11 @@ jobs:
       - run: npm ci
       - run: npm test
 
-  # The iOS apps (DEC-112): SwiftLint, swift-format, the package's unit tests at 100 % of lines and functions, and both apps'
-  # UI tests against the stub, on a GitHub-hosted Mac (the lab server's runners are Linux; a pull request job never runs
-  # there). The tools are the releases service/ios/scripts/tools.sh pins, checked by their SHA-256.
-  # the iOS checks as parallel jobs (service/ios/scripts/check.sh by part): the lint, the unit tests with their coverage,
-  # the Customer app's UI tests and the Technician app's in two halves; ios below is the required check over them
+  # The iOS apps (DEC-112): SwiftLint, swift-format and the package's unit tests at 100 % of lines and functions, on a
+  # GitHub-hosted Mac (the lab server's runners are Linux; a pull request job never runs there). The tools are the
+  # releases service/ios/scripts/tools.sh pins, checked by their SHA-256. The apps' UI tests take the longest and run
+  # every night and by hand instead (.github/workflows/ios-ui.yml, IR883), as the E2E tests do.
+  # the iOS checks as parallel jobs (service/ios/scripts/check.sh by part); ios below is the check over them
   ios-part:
     name: "iOS: ${{ matrix.name }}"
     runs-on: macos-26
@@ -302,11 +302,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: lint, part: lint, results: none }
-          - { name: unit tests, part: unit, results: none }
-          - { name: Customer UI tests, part: ui CustomerApp, results: customer }
-          - { name: Technician UI tests 1/2, part: ui TechnicianApp 1/2, results: technician-1 }
-          - { name: Technician UI tests 2/2, part: ui TechnicianApp 2/2, results: technician-2 }
+          - { name: lint, part: lint }
+          - { name: unit tests, part: unit }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false } # no later step pushes or fetches with the job's token
@@ -317,17 +314,9 @@ jobs:
         run: |
           # shellcheck disable=SC2086 # the part's words are the script's arguments
           sh service/ios/scripts/check.sh $PART
-      # a failed UI test's screenshots, recording and element tree, to read with Xcode or xcresulttool
-      - if: failure() && matrix.results != 'none'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: ios-ui-test-results-${{ matrix.results }}
-          path: service/ios/results/
-          retention-days: 7
-          if-no-files-found: ignore
 
   ios:
-    name: iOS (lint, unit tests, UI tests)
+    name: iOS (lint, unit tests)
     if: always()
     needs: [ios-part]
     runs-on: ubuntu-latest

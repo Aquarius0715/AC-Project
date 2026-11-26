@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "877812dde92e5c6a687100f1ab6f5a68acc5ec40b041a9cfbcc544032a1c68ac",
+  "spec_baseline_id": "f388fc327b92bd6f29d9fb840a265e98e9fb7cbce43a85ea21927066289edaf1",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -170,7 +170,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "9add0d1847e9c63137aefadbaa193835f69a33b008855664ba5aeb0b6423cc4a"
+      "sha256": "d3f5c34291f32d4dbd1ff30f21c721d130476ec41db2db781730d196f37d8b63"
     },
     {
       "path": "02-design/service-contracts.ts",
@@ -298,7 +298,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "e7d424a0ee1ff31f1c72871716118939c4199a96248b05d97493ebbf4ceccabf"
+      "sha256": "6898d030e8705a44619ccf261bcb1a888de7f59e8e4cd699c3a25d7ec4ddda47"
     },
     {
       "path": "tools/check_review_regressions.py",

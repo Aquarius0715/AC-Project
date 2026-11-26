@@ -84,6 +84,7 @@ TEST_RUNNER_AC_UI_LIVE=1 xcodebuild -project service/ios/AC.xcodeproj -scheme Cu
 #   TEST_RUNNER_AC_UI_LIVE_REPORT=<job id> on such a job fills its report, saves, signs and submits it
 ```
 
-GitHub Actions run the same: `.github/workflows/ci.yml` (11 parallel jobs, 21 checks, the iOS ones on a macOS runner) on every push to `main` and on
-pull requests, and `.github/workflows/e2e.yml` (the compose stack + Playwright) every night on `main` and by hand. Actions are pinned by commit SHA, images by
+GitHub Actions run the same: `.github/workflows/ci.yml` (11 parallel jobs, 18 checks, the iOS lint and unit tests on a macOS runner) on every push to
+`main` and on pull requests; `.github/workflows/e2e.yml` (the compose stack + Playwright) and `.github/workflows/ios-ui.yml`
+(the iOS apps' UI tests) every night on `main` and by hand. Actions are pinned by commit SHA, images by
 digest and Go/npm dependencies by lock file; `.github/dependabot.yml` proposes their updates as weekly pull requests.
