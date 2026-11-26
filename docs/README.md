@@ -105,6 +105,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.654.0 (2026-11-16): IR811: from Turn off running ACs, one link opens an after-hours rule with the same ACs.
 0.657.0 (2026-11-16): IR814: a customer pins ACs to the Overview from their pages (this browser only).
 0.658.0 (2026-11-16): IR815: Energy & cost opens on the AC that used the most in the period.
+0.693.0 (2026-11-26): IR883 (DEC-112): the iOS apps' UI tests run every night and by hand (ios-ui.yml) instead of in each CI run, which keeps the iOS lint and unit tests.
 0.692.0 (2026-11-26): IR881 (DEC-112): AC Customer sends a change a moment after the last tap without a confirmation (with its undo), switches the power with one tap, folds the command history, and has a Settings tab with one location switch (it also records the consent) and Sign out.
 0.691.0 (2026-11-21): IR870 (DEC-112): AC Technician shows the overview over its jobs (tiles, alerts on its units, reports by state), the report's versions with their reviews, and opens a report photo.
 0.690.0 (2026-11-21): IR869 (DEC-112): AC Technician lists the devices of the assigned units, registers one on a unit without, and checks, updates, calibrates and rebinds a device, with notes and alert acknowledgements on its events.

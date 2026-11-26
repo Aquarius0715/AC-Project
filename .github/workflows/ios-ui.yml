@@ -1,0 +1,71 @@
+# The iOS apps' UI tests (DEC-112): both apps driven in the simulator against the stub, with the accessibility audit of
+# each screen, the Customer app's in one job and the Technician app's in two halves (service/ios/scripts/check.sh ui).
+# They take the longest of the checks (10 to 15 minutes, on a GitHub-hosted Mac), so, as the E2E tests, they run by hand
+# (Actions > iOS UI tests > Run workflow, on any branch) and every night on main, not on each push and pull request
+# (IR883). The night is skipped when no commit of the last day touched the apps or what they are generated from; a
+# failed night is mailed by GitHub. Locally: sh service/ios/scripts/check.sh (all parts) or check.sh ui <scheme> [k/n].
+name: iOS UI tests
+
+on:
+  schedule:
+    - cron: "0 20 * * *" # 03:00 WIB
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-ui-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  changed:
+    name: iOS changed in the last day
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false, fetch-depth: 0 }
+      - id: check
+        env: { EVENT: "${{ github.event_name }}" }
+        # a run by hand always runs; a night only after a change to the apps, their generators or the contracts
+        run: |
+          if [ "$EVENT" != schedule ] || [ -n "$(git log --since='25 hours ago' --format=%H -- service/ios service/web/codegen docs/02-design/service-contracts.ts service/web/shared/lib)" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  ui:
+    name: "iOS: ${{ matrix.name }}"
+    needs: [changed]
+    if: needs.changed.outputs.run == 'true'
+    runs-on: macos-26
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Customer UI tests, part: ui CustomerApp, results: customer }
+          - { name: Technician UI tests 1/2, part: ui TechnicianApp 1/2, results: technician-1 }
+          - { name: Technician UI tests 2/2, part: ui TechnicianApp 2/2, results: technician-2 }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false } # no later step pushes or fetches with the job's token
+      - name: Xcode and simulators
+        run: xcodebuild -version && xcrun simctl list runtimes
+      - name: check.sh ${{ matrix.part }}
+        env: { PART: "${{ matrix.part }}" }
+        run: |
+          # shellcheck disable=SC2086 # the part's words are the script's arguments
+          sh service/ios/scripts/check.sh $PART
+      # a failed UI test's screenshots, recording and element tree, to read with Xcode or xcresulttool
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-ui-test-results-${{ matrix.results }}
+          path: service/ios/results/
+          retention-days: 7
+          if-no-files-found: ignore
