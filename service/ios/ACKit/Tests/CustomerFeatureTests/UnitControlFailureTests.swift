@@ -86,6 +86,16 @@ import Testing
         #expect(!model.isSending)
     }
 
+    @Test func aRefusedSendLeavesItsChangesForTryAgain() async throws {
+        let busy = #"{"code":"CONFLICT","messageKey":"errors.unit_busy","fieldErrors":{},"correlationId":"c","retryAfterSeconds":null}"#
+        let detail = try unit()
+        let model = try await lowered(detail, then: [.http(409, busy), try answer(detail), try noCommands])
+        #expect(model.isSettling && !model.isLeftBehind, "on its way while the wait runs")
+        await model.sendWhenSettled()
+        #expect(!model.isSettling)
+        #expect(model.isLeftBehind, "the refused change waits for Try again")
+    }
+
     @Test(arguments: [
         ("error.versionConflict", "this AC changed — reload and try again"),
         ("control.restriction_active", "a service restriction limits this setting"),

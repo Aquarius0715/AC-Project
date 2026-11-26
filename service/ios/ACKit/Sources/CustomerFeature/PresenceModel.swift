@@ -144,6 +144,19 @@ public final class PresenceModel {
         if !granted, isOn { await set(false) }
     }
 
+    /// The one switch of the screen: on records the consent first when it is not granted (a refused grant leaves the
+    /// switch off), off stops this phone's reports and keeps the consent.
+    public func use(_ on: Bool) async {
+        if on, !isConsentGranted {
+            await setConsent(true)
+            guard isConsentGranted else { return }
+        }
+        await set(on)
+    }
+
+    /// The switch is shown on only while it is on and the consent it needs is granted.
+    public var isInUse: Bool { isOn && isConsentGranted }
+
     /// The switch.
     public func set(_ on: Bool) async {
         settings.set(on)
