@@ -105,7 +105,7 @@ A new shared component is added when the same composition appears on two screens
 
 ## 5. UI/UX rules for screens
 
-As built in IR884 every screen takes its values from the tokens; the move of the existing screens onto `StatusLabel`, `DisclosureRow` and the send haptics follows screen by screen (the Customer app, then the Technician app). A new screen follows these rules from the start.
+As built in IR884 every screen takes its values from the tokens. The Customer app and the shared screens (sign-in, notifications) use the components: the AC list is cards of `DisclosureRow`s, the AC screen's offline, restriction, blocked, sending and outcome lines are `StatusLabel`s, a send's answer gives its haptic, and withdrawing the location consent is a destructive action. The Technician app follows. A new screen follows these rules from the start.
 
 **Navigation.** A TabView of three tabs at most per app, each tab its own NavigationStack; detail screens are pushed (`navigationDestination`) and hide the tab bar. A sheet is for a short task that returns to the same screen (check in, add a part, sign off), with Cancel/Close; a full-screen cover only for the camera. Back is always the system's back button and edge swipe; a screen never navigates by itself after an action. Titles are inline.
 

@@ -52,29 +52,29 @@ struct UnitsView: View {
 
     var body: some View {
         NavigationStack {
-            List {
+            // cards in a scroll view, as every screen (CardView.swift): a List leaves the rows out of view out of the audit
+            Group {
                 if let message = model.units.message {
-                    Text(verbatim: message).foregroundStyle(Palette.critical).accessibilityIdentifier("units.message")
+                    Card { StatusLabel(message, tone: .critical).accessibilityIdentifier("units.message") }
                 }
-                ForEach(model.units.value ?? []) { unit in
-                    NavigationLink(value: unit.id) {
-                        VStack(alignment: .leading, spacing: Spacing.xs) {
-                            Text(verbatim: unit.name).font(.headline)
-                            HStack(spacing: Spacing.s) {
-                                Text(verbatim: unit.power)
-                                Text(verbatim: unit.connection)
+                let units = model.units.value ?? []
+                if !units.isEmpty {
+                    Card {
+                        ForEach(units) { unit in
+                            NavigationLink(value: unit.id) {
+                                DisclosureRow(title: unit.name, details: [unit.power, unit.connection])
+                                    .accessibilityElement(children: .combine)
                             }
-                            .font(.subheadline)
+                            .accessibilityIdentifier("unit.\(unit.id)")
                         }
-                        .accessibilityElement(children: .combine)
                     }
-                    .accessibilityIdentifier("unit.\(unit.id)")
                 }
                 if case .loaded([]) = model.units {
-                    Text(verbatim: tr("No ACs in your account yet."))
+                    Card { Text(verbatim: tr("No ACs in your account yet.")) }
                 }
             }
-            .overlay { if case .loading = model.units { ProgressView() } }
+            .cardScreen()
+            .loadingOverlay(model.units.isLoading)
             .navigationTitle(Text(verbatim: tr("Air conditioners")))
             .inlineTitle()
             .refreshable { await model.load() }

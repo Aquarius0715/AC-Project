@@ -27,7 +27,8 @@ public struct DisclosureRow: View {
             Spacer(minLength: 0)
             Image(symbol: .disclosure).font(.footnote.weight(.semibold)).accessibilityHidden(true)
         }
-        .foregroundStyle(.primary)
+        // the concrete body colour: inside a NavigationLink iOS 26 resolves the hierarchical `.primary` to the tint
+        .foregroundStyle(Color.primary)
         .contentShape(Rectangle())
     }
 }

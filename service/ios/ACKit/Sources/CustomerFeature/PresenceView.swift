@@ -58,8 +58,8 @@ struct PresenceView: View {
                 Text(verbatim: tr("Switching this on gives your location consent, for arrival/departure automations only."))
                     .font(.footnote)
             } else if !model.isOn {
-                Button(tr("Withdraw consent")) { isWithdrawing = true }
-                    .secondaryAction()
+                Button(tr("Withdraw consent"), role: .destructive) { isWithdrawing = true }
+                    .destructiveAction()
                     .disabled(model.isSavingConsent)
                     .accessibilityIdentifier("consent.withdraw")
             }
