@@ -55,9 +55,8 @@ struct ReportView: View {
         .inlineTitle()
         .hideTabBar()
         .task { await model.load() }
-        // a write's answer is felt as well as read (the system's haptics follow the user's settings)
-        .sensoryFeedback(trigger: model.note) { _, note in note == nil ? nil : .success }
-        .sensoryFeedback(trigger: model.refusal) { _, refusal in refusal == nil ? nil : .error }
+        // a refusal is felt as well as read; no success haptic here: the draft saves itself every 20 s
+        .sensoryFeedback(.error, trigger: model.refusal) { _, new in new != nil }
         .sheet(item: $shown) { photo in
             NavigationStack {
                 PhotoImage(data: photo.data, name: photo.name)

@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "eddf6e50f3137d4a83d4d253c795a7bcfdcfa011de1b86cd12627b08216f85b0",
+  "spec_baseline_id": "9cdce93057b3fdfb7dbc690ec489e8c72d9b0d0ea4da256e7a7dcf9b750125ef",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -170,7 +170,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "dd8b62024ddd5115699af552b6a93e67b45c30554731224351302ed6726cbb89"
+      "sha256": "acc90bce50df680bd6d54b084e3a32f924330f44f7dc1ec50b70c08b97c62087"
     },
     {
       "path": "02-design/service-contracts.ts",
@@ -198,7 +198,7 @@
     },
     {
       "path": "03-uiux/ios-design-system.md",
-      "sha256": "9198f70c7c37ea8de03336a01ece17d74c30c6bd0d9fd4bbb572e1dfc2c3480d"
+      "sha256": "d73e80e4b291b818e514f4d3e7eb8aaab782c05023a8fe40c3bf6c6db2e8e360"
     },
     {
       "path": "03-uiux/screen-catalog.csv",

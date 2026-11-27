@@ -38,9 +38,8 @@ struct JobDetailView: View {
         .hideTabBar()
         .task { await model.load() }
         .refreshable { await model.load() }
-        // a write's answer is felt as well as read (the system's haptics follow the user's settings)
-        .sensoryFeedback(trigger: model.note) { _, note in note == nil ? nil : .success }
-        .sensoryFeedback(trigger: model.refusal) { _, refusal in refusal == nil ? nil : .error }
+        // a write's answer is felt as well as read
+        .writeFeedback(note: model.note, refusal: model.refusal)
         .sheet(item: $sheet) { sheet in
             switch sheet {
             case .checkIn: CheckInView(model: model) { self.sheet = nil }

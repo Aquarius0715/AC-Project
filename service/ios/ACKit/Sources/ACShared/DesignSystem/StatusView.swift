@@ -37,6 +37,15 @@ extension View {
     }
 }
 
+extension View {
+    /// The system's success haptic when a write's note appears and its error haptic when a refusal does (the haptics
+    /// follow the user's settings). One modifier with plain conditions, so a long screen's body stays quick to type-check.
+    public func writeFeedback(note: String?, refusal: String?) -> some View {
+        sensoryFeedback(.success, trigger: note) { _, new in new != nil }
+            .sensoryFeedback(.error, trigger: refusal) { _, new in new != nil }
+    }
+}
+
 #Preview("Status labels") {
     Card {
         ForEach(Tone.allCases, id: \.self) { tone in StatusLabel("A status in the \(tone) tone", tone: tone) }
