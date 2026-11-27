@@ -122,7 +122,7 @@ struct ReportView: View {
                 ),
                 matching: .images
             ) {
-                Label(title, systemImage: "photo")
+                Label(title, symbol: .photo)
             }
             .secondaryAction()
             .disabled(model.isSending)
@@ -132,7 +132,7 @@ struct ReportView: View {
                     pickedFor = target
                     isTakingPhoto = true
                 } label: {
-                    Label(tr("Take photo"), systemImage: "camera")
+                    Label(tr("Take photo"), symbol: .camera)
                 }
                 .secondaryAction()
                 .disabled(model.isSending)
@@ -146,7 +146,7 @@ struct ReportView: View {
                 Label {
                     Text(verbatim: note)
                 } icon: {
-                    Image(systemName: "checkmark.circle")
+                    Image(symbol: .success)
                 }.accessibilityIdentifier("report.note")
             }
         }
@@ -155,7 +155,7 @@ struct ReportView: View {
                 Label {
                     Text(verbatim: refusal)
                 } icon: {
-                    Image(systemName: "exclamationmark.triangle")
+                    Image(symbol: .warning)
                 }
                 .accessibilityIdentifier("report.refusal")
             }
@@ -180,7 +180,7 @@ struct ReportView: View {
                             }
                         }
                     } label: {
-                        Label(photo.name, systemImage: "photo")
+                        Label(photo.name, symbol: .photo)
                     }
                     .linkAction()
                     .accessibilityIdentifier("report.photo.open.\(photo.id)")
@@ -203,7 +203,7 @@ struct ReportView: View {
         if !rows.isEmpty {
             Card(tr("Versions & autosave")) {
                 ForEach(rows, id: \.title) { row in
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: Spacing.xxs) {
                         Text(verbatim: "\(row.title) · \(row.badge)").font(.headline)
                         Text(verbatim: row.sub).font(.subheadline)
                     }
@@ -251,7 +251,7 @@ struct ReportView: View {
                     Label {
                         Text(verbatim: issue.text)
                     } icon: {
-                        Image(systemName: "exclamationmark.circle").foregroundStyle(.red)
+                        Image(symbol: .failed).foregroundStyle(Palette.critical)
                     }
                 }
             }
@@ -261,7 +261,7 @@ struct ReportView: View {
                     .disabled(model.isSending)
                     .accessibilityIdentifier("report.save")
                 Button(tr("Submit report")) { if model.checkSubmit() { isConfirmingSubmit = true } }
-                    .buttonStyle(.borderedProminent)
+                    .primaryAction()
                     .disabled(model.isSending)
                     .accessibilityIdentifier("report.submit")
             }

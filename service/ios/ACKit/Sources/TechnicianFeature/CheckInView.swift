@@ -37,7 +37,7 @@ struct CheckInView: View {
                         Button(tr("Check in & start")) {
                             Task { if await model.submitCheckIn() { close() } }
                         }
-                        .buttonStyle(.borderedProminent)
+                        .primaryAction()
                         .disabled(model.isSending)
                         .accessibilityIdentifier("checkIn.submit")
                         Button(tr("Cancel"), action: close).secondaryAction().accessibilityIdentifier("checkIn.cancel")
@@ -54,7 +54,7 @@ struct CheckInView: View {
     private func method(_ method: JobsCheckInInputMethod, _ title: String, id: String) -> some View {
         Group {
             if model.checkIn.method == method {
-                Button(title) { model.checkIn.method = method }.buttonStyle(.borderedProminent)
+                Button(title) { model.checkIn.method = method }.primaryAction()
             } else {
                 Button(title) { model.checkIn.method = method }.secondaryAction()
             }
@@ -71,7 +71,7 @@ struct CheckInView: View {
         Button {
             Task { await model.locate() }
         } label: {
-            Label(label, systemImage: "location")
+            Label(label, symbol: .location)
         }
         .secondaryAction()
         .disabled(model.isLocating)
@@ -91,7 +91,7 @@ struct CheckInView: View {
             Button {
                 isScanning = true
             } label: {
-                Label(tr("Scan"), systemImage: "qrcode.viewfinder")
+                Label(tr("Scan"), symbol: .scan)
             }
             .secondaryAction()
             .accessibilityIdentifier("checkIn.scan")
@@ -120,7 +120,7 @@ struct CheckInView: View {
             Label {
                 Text(verbatim: text)
             } icon: {
-                Image(systemName: "exclamationmark.circle").foregroundStyle(.red)
+                Image(symbol: .failed).foregroundStyle(Palette.critical)
             }
             .accessibilityIdentifier("checkIn.error.\(field.rawValue)")
         }
@@ -168,7 +168,7 @@ struct CantMakeView: View {
                         Button(tr("Send to coordinator")) {
                             Task { if await model.sendCantMake() { close() } }
                         }
-                        .buttonStyle(.borderedProminent)
+                        .primaryAction()
                         .disabled(model.isSending)
                         .accessibilityIdentifier("cantMake.send")
                         Button(tr("Cancel"), action: close).secondaryAction().accessibilityIdentifier("cantMake.cancel")

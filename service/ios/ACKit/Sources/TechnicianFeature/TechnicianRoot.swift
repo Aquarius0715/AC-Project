@@ -17,7 +17,7 @@ public struct TechnicianRoot: View {
 
     public var body: some View {
         // the membership's language rebuilds the screens in it once preferences.get has answered
-        content.tint(Brand.primary).id(session.language)
+        content.tint(Palette.accent).id(session.language)
     }
 
     @ViewBuilder private var content: some View {
@@ -25,11 +25,11 @@ public struct TechnicianRoot: View {
         case .signedIn:
             TabView {
                 JobsView(model: JobsModel(client: session.client), session: session, position: position)
-                    .tabItem { Label(tr("Jobs"), systemImage: "wrench.and.screwdriver") }
+                    .tabItem { Label(tr("Jobs"), symbol: .jobs) }
                 DevicesView(model: DevicesModel(client: session.client))
-                    .tabItem { Label(tr("Devices"), systemImage: "sensor") }
+                    .tabItem { Label(tr("Devices"), symbol: .devices) }
                 NotificationsView(model: NotificationsModel(client: session.client))
-                    .tabItem { Label(tr("Notifications"), systemImage: "bell") }
+                    .tabItem { Label(tr("Notifications"), symbol: .notifications) }
             }
             .task { await session.applyPreferences() }
         case .signedOut, .signingIn:
@@ -61,7 +61,7 @@ struct JobsView: View {
                         Label {
                             Text(verbatim: line)
                         } icon: {
-                            Image(systemName: "envelope").foregroundStyle(.orange)
+                            Image(symbol: .message).foregroundStyle(Palette.warn)
                         }
                         .accessibilityIdentifier("jobs.answer")
                     }
@@ -108,13 +108,13 @@ struct JobsView: View {
             ForEach(rows) { row in
                 NavigationLink(value: row.jobId) {
                     HStack {
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: Spacing.xs) {
                             Text(verbatim: row.title).font(.headline)
                             Text(verbatim: "\(row.badge) · \(row.sub)").font(.subheadline)
                         }
                         .multilineTextAlignment(.leading)
                         Spacer(minLength: 0)
-                        Image(systemName: "chevron.right").accessibilityHidden(true)
+                        Image(symbol: .disclosure).accessibilityHidden(true)
                     }
                     .foregroundStyle(.primary)
                 }
@@ -131,14 +131,14 @@ struct JobsView: View {
                 ForEach(jobs) { job in
                     NavigationLink(value: job.id) {
                         HStack {
-                            VStack(alignment: .leading, spacing: 4) {
+                            VStack(alignment: .leading, spacing: Spacing.xs) {
                                 Text(verbatim: job.title).font(.headline)
                                 Text(verbatim: job.badge).font(.subheadline.weight(.semibold))
                                 Text(verbatim: job.line).font(.subheadline)
                             }
                             .multilineTextAlignment(.leading)
                             Spacer(minLength: 0)
-                            Image(systemName: "chevron.right").accessibilityHidden(true)
+                            Image(symbol: .disclosure).accessibilityHidden(true)
                         }
                         .foregroundStyle(.primary)
                     }

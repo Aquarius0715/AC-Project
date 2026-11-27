@@ -75,7 +75,7 @@ struct ChecklistCard<Add: View>: View {
     @ViewBuilder
     private func row(_ item: ReportDraft.Item) -> some View {
         let name = Checklist.label(item.key)
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.s) {
             Text(verbatim: name).font(.headline)
             if model.isEditable {
                 Picker(selection: result(item.key)) {

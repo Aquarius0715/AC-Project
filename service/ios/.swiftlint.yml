@@ -101,3 +101,29 @@ custom_rules:
     excluded: 'ACKit/Sources/ACShared/(ErrorText|Localizer)\.swift'
     message: "tr takes its key as a string literal, so the generator finds and translates it"
     severity: error
+  # the design system (docs/03-uiux/ios-design-system.md): colours, spacing, radii, symbols and button kinds are named
+  # in ACShared/DesignSystem and taken from there, so a change of one is made in one place
+  sf_symbol_name:
+    name: "SF Symbol by its meaning"
+    regex: '(systemName|systemImage):\s*"'
+    excluded: 'ACShared/DesignSystem/'
+    message: "name the symbol by its meaning: Image(symbol: .warning), Label(title, symbol: .photo) (Symbol.swift)"
+    severity: error
+  palette_colour:
+    name: "Colour from the palette"
+    regex: '\.(foregroundStyle|foregroundColor|tint|fill|stroke|background)\(\s*(Color)?\.(red|green|orange|yellow|blue|purple|pink|teal|indigo|mint|cyan|brown|gray)\b|Color\(\s*red:'
+    excluded: 'ACShared/DesignSystem/'
+    message: "take the colour of its use from Palette (Palette.critical, Palette.accent …) or a Tone"
+    severity: error
+  primary_action_style:
+    name: "Primary action style"
+    regex: '\.buttonStyle\(\s*\.borderedProminent'
+    excluded: 'ACShared/DesignSystem/'
+    message: "a primary button is .primaryAction() (ActionsView.swift): the brand fill of both appearances"
+    severity: error
+  spacing_token:
+    name: "Spacing from the scale"
+    regex: '(spacing|cornerRadius):\s*[0-9]|\.padding\(\s*(\.[a-zA-Z]+\s*,\s*)?[0-9]'
+    excluded: 'ACShared/DesignSystem/'
+    message: "take the step from Spacing or Radius (Tokens.swift)"
+    severity: error

@@ -41,7 +41,7 @@ struct ControlView: View {
                 Label {
                     Text(verbatim: note)
                 } icon: {
-                    Image(systemName: "checkmark.circle")
+                    Image(symbol: .success)
                 }.accessibilityIdentifier("control.note")
             }
         }
@@ -50,7 +50,7 @@ struct ControlView: View {
                 Label {
                     Text(verbatim: refusal)
                 } icon: {
-                    Image(systemName: "exclamationmark.triangle")
+                    Image(symbol: .warning)
                 }
                 .accessibilityIdentifier("control.refusal")
             }
@@ -77,7 +77,7 @@ struct ControlView: View {
             Card(tr("Command history — this job")) {
                 if model.history.isEmpty { Text(verbatim: tr("No commands for this job yet.")) }
                 ForEach(model.history) { row in
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: Spacing.xxs) {
                         Text(verbatim: row.title).font(.headline)
                         Text(verbatim: "\(row.badge) · \(row.sub)").font(.subheadline)
                     }
@@ -114,7 +114,7 @@ struct ControlView: View {
             .accessibilityIdentifier("control.reason")
             if let error = model.fieldErrors["reason"] { Text(verbatim: error).accessibilityIdentifier("control.error.reason") }
             Button(tr("Review & send")) { Task { await model.send() } }
-                .buttonStyle(.borderedProminent)
+                .primaryAction()
                 .disabled(model.isSending || model.isActive)
                 .accessibilityIdentifier("control.send")
             Text(
@@ -145,7 +145,7 @@ struct ControlView: View {
                 Text(verbatim: error).accessibilityIdentifier("control.error.run")
             }
             Button(tr("Test run")) { Task { await model.startRun() } }
-                .buttonStyle(.borderedProminent)
+                .primaryAction()
                 .disabled(model.isSending || model.isActive)
                 .accessibilityIdentifier("control.run.submit")
             Text(verbatim: tr("1–15 minutes only. Reason required. Cannot start during firmware updates or an unfinished command.")).font(

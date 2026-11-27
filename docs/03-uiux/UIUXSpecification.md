@@ -159,6 +159,8 @@ The Tailwind theme tokens (primary, surface, line, muted and the like) map to th
 
 Serve fonts locally after checking the official licenses. Do not permanently hotlink the reference site's hashed woff2 files. English and Malay both use Latin script, so no additional font design is needed. Dark mode and copying the brand logo are outside this standard.
 
+The iOS apps (DEC-112) take the same light values in their own tokens, with dark ones beside them, and the platform's text styles and controls: see the [iOS design system](ios-design-system.md) (IR884).
+
 ## UX-05. Shared component contracts
 
 | Shared component | Input summary (component-contracts.csv is authoritative for props; IR72 rank 5, IR102) | Rules |
@@ -177,6 +179,8 @@ Serve fonts locally after checking the official licenses. Do not permanently hot
 | Timeline / NotificationPanel / NotificationPreview | actor, time, action, result, correlationId | Label previews as "Preview — not sent." Distinguish read status from business completion |
 
 UI primitives must not call business Repositories directly. Business components receive typed props and callbacks; feature hooks fetch data. Express role differences through permissions and displayed data instead of maintaining four copies of the same component.
+
+The iOS apps' shared components (Card, Fact, DisclosureRow, StatusLabel and the button kinds) are listed in the [iOS design system](ios-design-system.md#4-shared-components).
 
 ## UX-06. Interaction, language, and accessibility
 

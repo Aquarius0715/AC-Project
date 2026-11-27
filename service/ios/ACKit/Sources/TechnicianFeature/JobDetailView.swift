@@ -53,7 +53,7 @@ struct JobDetailView: View {
                 Label {
                     Text(verbatim: note)
                 } icon: {
-                    Image(systemName: "checkmark.circle")
+                    Image(symbol: .success)
                 }.accessibilityIdentifier("job.note")
             }
         }
@@ -62,7 +62,7 @@ struct JobDetailView: View {
                 Label {
                     Text(verbatim: refusal)
                 } icon: {
-                    Image(systemName: "exclamationmark.triangle")
+                    Image(symbol: .warning)
                 }
                 .accessibilityIdentifier("job.refusal")
             }
@@ -101,21 +101,21 @@ struct JobDetailView: View {
             NavigationLink {
                 TechUnitView(model: TechUnitModel(unitId: work.job.unitId, jobId: work.job.id, client: model.client))
             } label: {
-                Label(tr("Unit"), systemImage: "air.conditioner.horizontal")
+                Label(tr("Unit"), symbol: .airConditioner)
             }
             .linkAction()
             .accessibilityIdentifier("job.unit")
             NavigationLink {
                 AlertsView(model: AlertsModel(unitId: work.job.unitId, jobId: work.job.id, alertId: nil, client: model.client))
             } label: {
-                Label(tr("Alert evidence"), systemImage: "exclamationmark.bubble")
+                Label(tr("Alert evidence"), symbol: .alertEvidence)
             }
             .linkAction()
             .accessibilityIdentifier("job.alerts")
             NavigationLink {
                 ControlView(model: ControlModel(unitId: work.job.unitId, jobId: work.job.id, client: model.client))
             } label: {
-                Label(tr("Diagnostics"), systemImage: "stethoscope")
+                Label(tr("Diagnostics"), symbol: .diagnostics)
             }
             .linkAction()
             .accessibilityIdentifier("job.diagnostics")
@@ -128,7 +128,7 @@ struct JobDetailView: View {
                 NavigationLink {
                     ReportView(model: report)
                 } label: {
-                    Label(tr("Open the work report"), systemImage: "doc.text")
+                    Label(tr("Open the work report"), symbol: .report)
                 }
                 .linkAction()
                 .accessibilityIdentifier("job.report")
@@ -143,14 +143,14 @@ struct JobDetailView: View {
         Label {
             Text(verbatim: banner.text)
         } icon: {
-            Image(systemName: icon(banner.tone)).foregroundStyle(color(banner.tone))
+            Image(symbol: banner.tone.symbol).foregroundStyle(banner.tone.color)
         }
         .accessibilityIdentifier("job.banner")
         switch banner.action {
         case .acknowledge?:
             HStack {
                 Button(tr("Accept assignment")) { Task { await model.accept() } }
-                    .buttonStyle(.borderedProminent)
+                    .primaryAction()
                     .accessibilityIdentifier("job.accept")
                 Button(tr("Can’t make this time…")) { sheet = .cantMake }
                     .secondaryAction()
@@ -159,50 +159,16 @@ struct JobDetailView: View {
             .disabled(model.isSending)
         case let .checkIn(enabled)?:
             Button(tr("Start job (check in)")) { sheet = .checkIn }
-                .buttonStyle(.borderedProminent)
+                .primaryAction()
                 .disabled(model.isSending || !enabled)
                 .accessibilityIdentifier("job.checkIn")
         case let .resumeRework(enabled)?:
             Button(tr("Resume rework")) { Task { await model.resumeRework() } }
-                .buttonStyle(.borderedProminent)
+                .primaryAction()
                 .disabled(model.isSending || !enabled)
                 .accessibilityIdentifier("job.resumeRework")
         case nil:
             EmptyView()
-        }
-    }
-
-    private func icon(_ tone: JobDetailModel.Banner.Tone) -> String {
-        switch tone {
-        case .info: "info.circle"
-        case .ok: "checkmark.circle"
-        case .warn: "exclamationmark.triangle"
-        case .critical: "exclamationmark.octagon"
-        }
-    }
-
-    private func color(_ tone: JobDetailModel.Banner.Tone) -> Color {
-        switch tone {
-        case .info: Brand.primary
-        case .ok: .green
-        case .warn: .orange
-        case .critical: .red
-        }
-    }
-}
-
-/// Label and value lines of a card (the web's SummaryList).
-struct Facts: View {
-    let rows: [(String, String)]
-
-    var body: some View {
-        ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-            VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: row.0).font(.subheadline.weight(.semibold))
-                Text(verbatim: row.1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .combine)
         }
     }
 }

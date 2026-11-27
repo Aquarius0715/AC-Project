@@ -10,7 +10,7 @@ import Observation
 public final class JobsModel {
     /// One job as its row shows it.
     public struct Row: Identifiable, Equatable, Sendable {
-        public enum Tone: Sendable { case info, ok, warn, critical, muted }
+        public typealias Tone = ACShared.Tone
         public let id: String
         /// The unit's name (or the job type of a past job).
         public let title: String
