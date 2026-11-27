@@ -54,17 +54,17 @@ public struct NotificationsView: View {
     @ViewBuilder
     private func filterButton(_ title: String, _ filter: NotificationsModel.Filter) -> some View {
         if model.filter == filter {
-            Button(title) { model.filter = filter }.buttonStyle(.borderedProminent).accessibilityAddTraits(.isSelected)
+            Button(title) { model.filter = filter }.primaryAction().accessibilityAddTraits(.isSelected)
         } else {
             Button(title) { model.filter = filter }.secondaryAction()
         }
     }
 
     private func label(_ row: NotificationsModel.Row) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.s) {
                 if !row.isRead {
-                    Image(systemName: "circle.fill").foregroundStyle(Brand.primary).accessibilityLabel(Text(verbatim: tr("Unread")))
+                    Image(symbol: .unread).foregroundStyle(Palette.accent).accessibilityLabel(Text(verbatim: tr("Unread")))
                 }
                 Text(verbatim: row.title).font(row.isRead ? .body : .headline)
             }

@@ -46,7 +46,7 @@ struct TechUnitView: View {
                 Label {
                     Text(verbatim: stopped)
                 } icon: {
-                    Image(systemName: "wifi.slash").foregroundStyle(.red)
+                    Image(symbol: .offline).foregroundStyle(Palette.critical)
                 }
             }
         }
@@ -78,7 +78,7 @@ struct TechUnitView: View {
                 NavigationLink {
                     ControlView(model: ControlModel(unitId: model.unitId, jobId: job, client: model.client))
                 } label: {
-                    Label(tr("Diagnostics"), systemImage: "stethoscope")
+                    Label(tr("Diagnostics"), symbol: .diagnostics)
                 }
                 .linkAction()
                 .accessibilityIdentifier("unit.diagnostics")
@@ -92,7 +92,7 @@ struct TechUnitView: View {
                 NavigationLink {
                     AlertsView(model: AlertsModel(unitId: model.unitId, jobId: model.jobId, alertId: row.id, client: model.client))
                 } label: {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: Spacing.xxs) {
                         Text(verbatim: row.title).font(.headline)
                         Text(verbatim: row.badge).font(.subheadline.weight(.semibold))
                         Text(verbatim: row.sub).font(.subheadline)
@@ -113,7 +113,7 @@ struct TechUnitView: View {
     private func choice(_ value: Tab, _ title: String, id: String) -> some View {
         Group {
             if tab == value {
-                Button(title) { tab = value }.buttonStyle(.borderedProminent)
+                Button(title) { tab = value }.primaryAction()
             } else {
                 Button(title) { tab = value }.secondaryAction()
             }
@@ -125,7 +125,7 @@ struct TechUnitView: View {
     @ViewBuilder private var tilesCard: some View {
         Card(tr("Time-series monitoring")) {
             ForEach(Array(model.tiles.enumerated()), id: \.offset) { _, tile in
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Spacing.xxs) {
                     Text(verbatim: tile.label).font(.subheadline.weight(.semibold))
                     Text(verbatim: tile.value).font(.title3)
                     Text(verbatim: tile.sub).font(.footnote)
@@ -141,7 +141,7 @@ struct TechUnitView: View {
             HStack {
                 ForEach(SeriesPeriod.allCases, id: \.self) { period in
                     if model.period == period {
-                        Button(period.label) { Task { await model.show(period) } }.buttonStyle(.borderedProminent)
+                        Button(period.label) { Task { await model.show(period) } }.primaryAction()
                     } else {
                         Button(period.label) { Task { await model.show(period) } }.secondaryAction()
                     }
@@ -195,7 +195,7 @@ struct TechUnitView: View {
     private func rows(_ rows: [UnitRow], empty: String, id: String) -> some View {
         if rows.isEmpty { Text(verbatim: empty).accessibilityIdentifier("\(id).empty") }
         ForEach(rows) { row in
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.xxs) {
                 Text(verbatim: row.title).font(.headline)
                 Text(verbatim: row.badge).font(.subheadline.weight(.semibold))
                 if !row.sub.isEmpty { Text(verbatim: row.sub).font(.subheadline) }

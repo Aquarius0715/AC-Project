@@ -50,6 +50,8 @@ DEC-112).
   text no web page has gets its translations in `service/ios/strings.json`. The generator refuses a text without them.
 - The screens' logic lives in models (`ACKit/Sources/*Feature`), which the unit tests cover; the screens themselves
   (`*View.swift`, `*Root.swift`) are covered by the UI tests, each with the accessibility audit.
+- A screen takes its colours, spacing, radii, symbols and button kinds from `ACShared/DesignSystem` by their use
+  (`docs/03-uiux/ios-design-system.md`); SwiftLint refuses the raw values elsewhere.
 
 ## 4. Fixing lint findings
 

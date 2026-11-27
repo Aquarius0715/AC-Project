@@ -6,8 +6,20 @@ extension XCUIApplication {
 
     /// The accessibility audit of the screen shown (contrast, labels, hit areas, Dynamic Type…), as jsx-a11y strict is for
     /// the web apps: every issue fails the test, named with its element so the failure says what to fix.
+    /// The audit in the light appearance, then in the dark one (docs/03-uiux/ios-design-system.md: both are held to the
+    /// same contrast); the screen is left in the light appearance for the test's next steps.
     @MainActor
     func audit() throws {
+        let device = XCUIDevice.shared
+        defer { device.appearance = .light }
+        device.appearance = .light
+        try audit(named: "light")
+        device.appearance = .dark
+        try audit(named: "dark")
+    }
+
+    @MainActor
+    private func audit(named appearance: String) throws {
         // a scroll the test made a moment ago may still be gliding: the audit's pictures of a moving screen fail the
         // contrast of still text
         _ = XCTWaiter().wait(for: [XCTestExpectation(description: "the screen settles")], timeout: 1)
@@ -16,7 +28,7 @@ extension XCUIApplication {
         if (try? issues()).map(\.isEmpty) == true { return }
         _ = XCTWaiter().wait(for: [XCTestExpectation(description: "the system banner goes")], timeout: 6)
         let issues = try issues()
-        if !issues.isEmpty { XCTFail("accessibility audit:\n" + issues.joined(separator: "\n")) }
+        if !issues.isEmpty { XCTFail("accessibility audit (\(appearance)):\n" + issues.joined(separator: "\n")) }
     }
 
     @MainActor

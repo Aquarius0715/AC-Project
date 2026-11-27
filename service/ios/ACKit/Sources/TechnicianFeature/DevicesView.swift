@@ -20,7 +20,7 @@ struct DevicesView: View {
                     HStack {
                         ForEach(DeviceFilter.allCases, id: \.self) { filter in
                             if model.filter == filter {
-                                Button(filter.label) { model.filter = filter }.buttonStyle(.borderedProminent)
+                                Button(filter.label) { model.filter = filter }.primaryAction()
                                     .accessibilityAddTraits(.isSelected)
                             } else {
                                 Button(filter.label) { model.filter = filter }.secondaryAction()
@@ -35,7 +35,7 @@ struct DevicesView: View {
                         NavigationLink {
                             DeviceView(model: DeviceModel(deviceId: row.id, client: model.client))
                         } label: {
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: Spacing.xxs) {
                                 Text(verbatim: row.title).font(.headline)
                                 Text(verbatim: row.sub).font(.subheadline)
                             }
@@ -51,7 +51,7 @@ struct DevicesView: View {
                         model.blank()
                         isRegistering = true
                     }
-                    .buttonStyle(.borderedProminent)
+                    .primaryAction()
                     .accessibilityIdentifier("devices.register")
                 }
             }
@@ -96,7 +96,7 @@ struct RegisterSheet: View {
                     if let refusal = model.refusal { Text(verbatim: refusal).accessibilityIdentifier("register.refusal") }
                     HStack {
                         Button(tr("Register")) { Task { if await model.register() { close() } } }
-                            .buttonStyle(.borderedProminent)
+                            .primaryAction()
                             .disabled(model.isSending)
                             .accessibilityIdentifier("register.save")
                         Button(tr("Cancel"), action: close).secondaryAction()
@@ -126,7 +126,7 @@ struct DeviceView: View {
                     Label {
                         Text(verbatim: note)
                     } icon: {
-                        Image(systemName: "checkmark.circle")
+                        Image(symbol: .success)
                     }.accessibilityIdentifier("device.note")
                 }
             }
@@ -135,7 +135,7 @@ struct DeviceView: View {
                     Label {
                         Text(verbatim: refusal)
                     } icon: {
-                        Image(systemName: "exclamationmark.triangle")
+                        Image(symbol: .warning)
                     }
                     .accessibilityIdentifier("device.refusal")
                 }
@@ -233,7 +233,7 @@ struct DeviceView: View {
         Card(tr("Device events")) {
             if model.eventRows.isEmpty { Text(verbatim: tr("No device events.")).accessibilityIdentifier("device.events.empty") }
             ForEach(model.eventRows) { row in
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Spacing.xs) {
                     Text(verbatim: row.title).font(.headline)
                     Text(verbatim: row.detail).font(.subheadline)
                     Text(verbatim: row.state).font(.subheadline.weight(.semibold))
@@ -266,7 +266,7 @@ struct DeviceView: View {
 
     private func rows(_ rows: [UnitRow]) -> some View {
         ForEach(rows) { row in
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.xxs) {
                 Text(verbatim: row.title).font(.headline)
                 Text(verbatim: row.sub).font(.subheadline)
             }

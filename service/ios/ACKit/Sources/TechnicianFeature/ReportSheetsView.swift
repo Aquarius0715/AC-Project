@@ -58,7 +58,7 @@ struct PartSheet: View {
                             model.edit { $0.parts.append(part) }
                             close()
                         }
-                        .buttonStyle(.borderedProminent)
+                        .primaryAction()
                         .accessibilityIdentifier("part.save")
                         Button(tr("Cancel"), action: close).secondaryAction()
                     }
@@ -109,7 +109,7 @@ struct RefrigerantSheet: View {
                             model.edit { $0.refrigerant.append(record) }
                             close()
                         }
-                        .buttonStyle(.borderedProminent)
+                        .primaryAction()
                         .accessibilityIdentifier("refrigerant.save")
                         Button(tr("Cancel"), action: close).secondaryAction()
                     }
@@ -151,16 +151,16 @@ struct SignOffSheet: View {
                             .textFieldStyle(.roundedBorder)
                             .accessibilityIdentifier("signOff.reason")
                         PhotosPicker(selection: $picked, matching: .images) {
-                            Label(sitePhoto.map(\.name) ?? tr("Site photo (JPEG/PNG)"), systemImage: "photo")
+                            Label(sitePhoto.map(\.name) ?? tr("Site photo (JPEG/PNG)"), symbol: .photo)
                         }
                         .secondaryAction()
                     } else {
                         SignaturePad(drawing: $drawing)
                             .frame(height: 180)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary))
+                            .clipShape(RoundedRectangle(cornerRadius: Radius.control))
+                            .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(.secondary))
                         HStack {
-                            Label(tr("Sign here"), systemImage: "signature").font(.footnote)
+                            Label(tr("Sign here"), symbol: .signature).font(.footnote)
                             Spacer()
                             Button(tr("Clear")) { drawing = PKDrawing() }.secondaryAction().disabled(drawing.strokes.isEmpty)
                         }
@@ -182,7 +182,7 @@ struct SignOffSheet: View {
                                 if saved { close() }
                             }
                         }
-                        .buttonStyle(.borderedProminent)
+                        .primaryAction()
                         .disabled(model.isSending)
                         .accessibilityIdentifier("signOff.save")
                         Button(tr("Cancel"), action: close).secondaryAction()
@@ -206,7 +206,7 @@ struct SignOffSheet: View {
     private func choice(_ absent: Bool, _ title: String, id: String) -> some View {
         Group {
             if isAbsent == absent {
-                Button(title) { isAbsent = absent }.buttonStyle(.borderedProminent)
+                Button(title) { isAbsent = absent }.primaryAction()
             } else {
                 Button(title) { isAbsent = absent }.secondaryAction()
             }

@@ -49,7 +49,7 @@ struct UnitDetailView: View {
     @ViewBuilder
     private func overview(_ unit: UnitDetail) -> some View {
         Card {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text(verbatim: unit.location.pathLabels.joined(separator: " › "))
                 Text(verbatim: "\(Labels.power(unit.effectivePowerState)) · \(Labels.connection(unit.connection))").font(.headline)
             }
@@ -63,7 +63,7 @@ struct UnitDetailView: View {
                 )
             } else {
                 reading(tr("Room temperature (measured)"), unit, .temperature)
-                Fact(label: tr("Confirmed setting"), value: confirmed(unit.observedState), note: nil)
+                Fact(label: tr("Confirmed setting"), value: confirmed(unit.observedState), isEmphasized: true)
                 reading(tr("Humidity"), unit, .humidity)
             }
         }
@@ -73,7 +73,7 @@ struct UnitDetailView: View {
         let measurement = unit.latestMeasurements.first { $0.metric == metric }
         let value = measurement.flatMap(Words.reading) ?? "—"
         let at = measurement.map { tr("observed {at}", ["at": Format.dateTime($0.observedAt)]) } ?? tr("no recent measurement")
-        return Fact(label: label, value: value, note: at)
+        return Fact(label: label, value: value, note: at, isEmphasized: true)
     }
 
     private func confirmed(_ state: ObservedState) -> String {
@@ -138,7 +138,7 @@ struct UnitDetailView: View {
         selection: Binding<Value>,
         words: @escaping (Value) -> String
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.s) {
             Text(verbatim: title)
             Picker(title, selection: selection) {
                 ForEach(options, id: \.self) { Text(verbatim: words($0)).tag($0) }
@@ -165,13 +165,13 @@ struct UnitDetailView: View {
     }
 
     private func temperature(_ range: CapabilityTemperature) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.s) {
             Text(verbatim: tr("Set temperature"))
             HStack {
                 Button {
                     model.lower()
                 } label: {
-                    Image(systemName: "minus").frame(minWidth: 44, minHeight: 44)
+                    Image(symbol: .decrease).frame(minWidth: Size.minTap, minHeight: Size.minTap)
                 }
                 .buttonStyle(.bordered)
                 .disabled(!model.canLower || model.isSending)
@@ -184,7 +184,7 @@ struct UnitDetailView: View {
                 Button {
                     model.raise()
                 } label: {
-                    Image(systemName: "plus").frame(minWidth: 44, minHeight: 44)
+                    Image(symbol: .increase).frame(minWidth: Size.minTap, minHeight: Size.minTap)
                 }
                 .buttonStyle(.bordered)
                 .disabled(!model.canRaise || model.isSending)
@@ -198,7 +198,7 @@ struct UnitDetailView: View {
                 Label {
                     Text(verbatim: hint)
                 } icon: {
-                    Image(systemName: "info.circle")
+                    Image(symbol: .info)
                 }.font(.footnote)
             }
         }
@@ -211,14 +211,14 @@ struct UnitDetailView: View {
             Label {
                 Text(verbatim: tr("Sending: {changes}", ["changes": model.changeSummary]))
             } icon: {
-                Image(systemName: "paperplane")
+                Image(symbol: .sending)
             }
             .font(.footnote)
             .accessibilityIdentifier("pending")
         } else if model.isLeftBehind {
             // a send that was refused leaves its changes: they go again only when asked
             Button(tr("Try again")) { Task { await model.sendChanges() } }
-                .buttonStyle(.borderedProminent)
+                .primaryAction()
                 .accessibilityIdentifier("retry")
         }
     }
@@ -228,7 +228,7 @@ struct UnitDetailView: View {
             // a new countdown for each command of the send (the web keys its wait banner by the command id)
             WaitingText(seconds: model.waiting?.seconds ?? 30).id(model.waiting?.commandId)
         } else if let outcome = model.outcome {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: Spacing.s) {
                 Label {
                     Text(verbatim: outcome.text)
                 } icon: {
@@ -258,16 +258,16 @@ struct UnitDetailView: View {
     }
 
     @ViewBuilder private var historyRows: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.s) {
             if model.historyRows.isEmpty {
                 Text(verbatim: tr("No commands for this AC yet"))
             }
             ForEach(model.historyRows) { row in
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Spacing.xxs) {
                     Label {
                         Text(verbatim: row.text)
                     } icon: {
-                        if row.isBad { Image(systemName: "exclamationmark.circle").accessibilityLabel(Text(verbatim: tr("Failed"))) }
+                        if row.isBad { Image(symbol: .failed).accessibilityLabel(Text(verbatim: tr("Failed"))) }
                     }
                     Text(verbatim: row.when).font(.footnote)
                 }
@@ -296,22 +296,5 @@ private struct WaitingText: View {
             }
         }
         .accessibilityIdentifier("waiting")
-    }
-}
-
-/// A reading or a setting: its name, its value and when it was observed, stacked so that every size of text fits
-/// (a label beside its value is cut at the largest sizes).
-private struct Fact: View {
-    let label: String
-    let value: String
-    let note: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(verbatim: label).font(.subheadline)
-            Text(verbatim: value).font(.headline)
-            if let note { Text(verbatim: note).font(.footnote) }
-        }
-        .accessibilityElement(children: .combine)
     }
 }

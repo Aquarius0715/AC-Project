@@ -29,7 +29,7 @@ public final class JobDetailModel {
 
     /// A line over the job: what the status asks of the technician, with the step it offers.
     public struct Banner: Sendable, Equatable {
-        public enum Tone: Sendable { case info, ok, warn, critical }
+        public typealias Tone = ACShared.Tone
         public enum Action: Sendable, Equatable { case acknowledge, checkIn(enabled: Bool), resumeRework(enabled: Bool) }
         public let tone: Tone
         public let text: String

@@ -4,7 +4,8 @@ import SwiftUI
 import UIKit
 #endif
 
-/// A card of a detail screen, as the web pages group a screen: a heading and its content on the grouped background.
+/// A card of a detail screen, as the web pages group a screen: a heading and its content on the surface colour, over the
+/// grouped background (no shadow: the two colours tell the levels apart, as the system's grouped lists do).
 /// A detail screen stacks its cards in a ScrollView, not a List: a List leaves the rows out of view out of the screen's
 /// elements, so the accessibility audit cannot check them at the larger text sizes.
 public struct Card<Content: View>: View {
@@ -17,13 +18,13 @@ public struct Card<Content: View>: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.m) {
             if let title { SectionHeading(title) }
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(.background, in: RoundedRectangle(cornerRadius: 12))
+        .padding(Spacing.l)
+        .background(Palette.surface, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
     }
 }
 
@@ -32,12 +33,12 @@ extension View {
     /// colour: text scrolled under the bar's translucent material is below the contrast the accessibility audit asks for.
     public func cardScreen() -> some View {
         ScrollView {
-            VStack(spacing: 16) { self }.padding(16)
+            VStack(spacing: Spacing.l) { self }.padding(Spacing.l)
         }
         // a drag down puts the keyboard away, so the screen under it can be read again (and audited); not any scroll:
         // the scroll that brings a focused field into view would close its keyboard again
         .scrollDismissesKeyboard(.interactively)
-        .background(Color.groupedBackground)
+        .background(Palette.background)
         .solidNavigationBar()
         .clearBottomEdge()
         .keyboardDone()
@@ -75,20 +76,9 @@ extension View {
 
     private func solidNavigationBar() -> some View {
         #if os(iOS)
-        toolbarBackground(Color.groupedBackground, for: .navigationBar).toolbarBackground(.visible, for: .navigationBar)
+        toolbarBackground(Palette.background, for: .navigationBar).toolbarBackground(.visible, for: .navigationBar)
         #else
         self
-        #endif
-    }
-}
-
-extension Color {
-    /// The grouped background of the system (the cards sit on it).
-    public static var groupedBackground: Color {
-        #if os(iOS)
-        Color(uiColor: .systemGroupedBackground)
-        #else
-        Color(nsColor: .windowBackgroundColor)
         #endif
     }
 }

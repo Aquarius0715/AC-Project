@@ -37,7 +37,7 @@ struct AlertsView: View {
                 Label {
                     Text(verbatim: note)
                 } icon: {
-                    Image(systemName: "checkmark.circle")
+                    Image(symbol: .success)
                 }.accessibilityIdentifier("alerts.note")
             }
         }
@@ -46,7 +46,7 @@ struct AlertsView: View {
                 Label {
                     Text(verbatim: refusal)
                 } icon: {
-                    Image(systemName: "exclamationmark.triangle")
+                    Image(symbol: .warning)
                 }
                 .accessibilityIdentifier("alerts.refusal")
             }
@@ -71,7 +71,7 @@ struct AlertsView: View {
                     Button {
                         Task { await model.select(choice.id) }
                     } label: {
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: Spacing.xxs) {
                             Text(verbatim: choice.title).font(.headline)
                             Text(verbatim: "\(choice.badge) · \(choice.sub)").font(.subheadline)
                         }
@@ -135,14 +135,14 @@ struct AlertsView: View {
         }
         if let problem = model.problem { Text(verbatim: problem).accessibilityIdentifier("alerts.problem") }
         Button(tr("Resolve alert")) { Task { await model.resolve() } }
-            .buttonStyle(.borderedProminent)
+            .primaryAction()
             .disabled(model.isSending)
             .accessibilityIdentifier("alerts.resolve")
     }
 
     private func rows(_ rows: [UnitRow]) -> some View {
         ForEach(rows) { row in
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.xxs) {
                 Text(verbatim: row.title).font(.headline)
                 Text(verbatim: row.sub).font(.subheadline)
             }

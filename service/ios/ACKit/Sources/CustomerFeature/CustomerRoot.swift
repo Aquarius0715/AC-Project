@@ -16,7 +16,7 @@ public struct CustomerRoot: View {
 
     public var body: some View {
         // the membership's language rebuilds the screens in it once preferences.get has answered
-        content.tint(Brand.primary).id(session.language)
+        content.tint(Palette.accent).id(session.language)
     }
 
     @ViewBuilder private var content: some View {
@@ -24,11 +24,11 @@ public struct CustomerRoot: View {
         case .signedIn:
             TabView {
                 UnitsView(model: UnitsModel(client: session.client), session: session)
-                    .tabItem { Label(tr("Air conditioners"), systemImage: "air.conditioner.horizontal") }
+                    .tabItem { Label(tr("Air conditioners"), symbol: .airConditioner) }
                 NotificationsView(model: NotificationsModel(client: session.client))
-                    .tabItem { Label(tr("Notifications"), systemImage: "bell") }
+                    .tabItem { Label(tr("Notifications"), symbol: .notifications) }
                 PresenceView(model: presence) { await session.signOut() }
-                    .tabItem { Label(tr("Settings"), systemImage: "gearshape") }
+                    .tabItem { Label(tr("Settings"), symbol: .settings) }
             }
             .task {
                 await session.applyPreferences()
@@ -54,13 +54,13 @@ struct UnitsView: View {
         NavigationStack {
             List {
                 if let message = model.units.message {
-                    Text(verbatim: message).foregroundStyle(.red).accessibilityIdentifier("units.message")
+                    Text(verbatim: message).foregroundStyle(Palette.critical).accessibilityIdentifier("units.message")
                 }
                 ForEach(model.units.value ?? []) { unit in
                     NavigationLink(value: unit.id) {
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: Spacing.xs) {
                             Text(verbatim: unit.name).font(.headline)
-                            HStack(spacing: 8) {
+                            HStack(spacing: Spacing.s) {
                                 Text(verbatim: unit.power)
                                 Text(verbatim: unit.connection)
                             }

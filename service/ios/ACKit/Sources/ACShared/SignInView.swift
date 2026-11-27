@@ -17,14 +17,14 @@ public struct SignInView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: Spacing.xl) {
             Spacer()
             Text(verbatim: "AC Project").font(.headline)
             Text(verbatim: title).font(.largeTitle.bold()).multilineTextAlignment(.center)
             if case let .signedOut(message?) = model.state {
                 Text(verbatim: message)
                     .font(.callout)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Palette.critical)
                     .multilineTextAlignment(.center)
                     .accessibilityIdentifier("signIn.message")
             }
@@ -39,13 +39,13 @@ public struct SignInView: View {
                         Text(verbatim: tr("Sign in"))
                     }
                 }
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .frame(maxWidth: .infinity, minHeight: Size.minTap)
             }
-            .buttonStyle(.borderedProminent)
+            .primaryAction()
             .disabled(model.state == .signingIn)
             .accessibilityIdentifier("signIn.button")
         }
-        .padding(24)
+        .padding(Spacing.xl)
     }
 
     private func open(_ url: URL, _ scheme: String) async throws -> URL {
