@@ -122,36 +122,39 @@ struct JobDetailView: View {
             .padding(Spacing.l)
             .background(Palette.surface)
             .disabled(model.isSending)
+            // one container, so the UI tests' audit knows what lies under the bar (UITestsShared/Audit.swift)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("actionBar")
         }
     }
 
     /// The button of one step: in the bar, the full-width primary button; in the menu, its line.
     @ViewBuilder
     private func stepButton(_ step: JobDetailModel.Step, inMenu: Bool = false) -> some View {
-        let button = Group {
+        let control = Group {
             switch step {
             case .accept:
-                button(tr("Accept assignment"), id: "job.accept", inMenu) { Task { await model.accept() } }
+                stepControl(tr("Accept assignment"), id: "job.accept", inMenu) { Task { await model.accept() } }
             case .cantMake:
-                button(tr("Can’t make this time…"), id: "job.cantMake", inMenu) { sheet = .cantMake }
+                stepControl(tr("Can’t make this time…"), id: "job.cantMake", inMenu) { sheet = .cantMake }
             case let .checkIn(enabled):
-                button(tr("Start job (check in)"), id: "job.checkIn", inMenu) { sheet = .checkIn }.disabled(!enabled)
+                stepControl(tr("Start job (check in)"), id: "job.checkIn", inMenu) { sheet = .checkIn }.disabled(!enabled)
             case let .resumeRework(enabled):
-                button(tr("Resume rework"), id: "job.resumeRework", inMenu) { Task { await model.resumeRework() } }
+                stepControl(tr("Resume rework"), id: "job.resumeRework", inMenu) { Task { await model.resumeRework() } }
                     .disabled(!enabled)
             case .report:
                 reportLink(inMenu)
             case .pause:
-                button(tr("Pause work"), id: "job.pause", inMenu) { Task { await model.setPaused(true) } }
+                stepControl(tr("Pause work"), id: "job.pause", inMenu) { Task { await model.setPaused(true) } }
             case .resume:
-                button(tr("Resume work"), id: "job.resume", inMenu) { Task { await model.setPaused(false) } }
+                stepControl(tr("Resume work"), id: "job.resume", inMenu) { Task { await model.setPaused(false) } }
             }
         }
-        if inMenu { button } else { button.primaryAction() }
+        if inMenu { control } else { control.primaryAction() }
     }
 
     /// A step's button; in the bar its label takes the bar's width (a bordered button is as wide as its label).
-    private func button(_ title: String, id: String, _ inMenu: Bool, action: @escaping () -> Void) -> some View {
+    private func stepControl(_ title: String, id: String, _ inMenu: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(verbatim: title).frame(maxWidth: inMenu ? nil : .infinity, minHeight: inMenu ? nil : Size.minTap)
         }
