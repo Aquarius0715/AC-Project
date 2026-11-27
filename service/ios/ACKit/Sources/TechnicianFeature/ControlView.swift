@@ -38,21 +38,13 @@ struct ControlView: View {
     @ViewBuilder private var cards: some View {
         if let note = model.note {
             Card {
-                Label {
-                    Text(verbatim: note)
-                } icon: {
-                    Image(symbol: .success)
-                }.accessibilityIdentifier("control.note")
+                StatusLabel(note, tone: .ok).accessibilityIdentifier("control.note")
             }
         }
         if let refusal = model.refusal {
             Card {
-                Label {
-                    Text(verbatim: refusal)
-                } icon: {
-                    Image(symbol: .warning)
-                }
-                .accessibilityIdentifier("control.refusal")
+                StatusLabel(refusal, tone: .critical)
+                    .accessibilityIdentifier("control.refusal")
             }
         }
         if let banner = model.banner {

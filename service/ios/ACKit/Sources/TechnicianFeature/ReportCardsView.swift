@@ -207,7 +207,7 @@ struct ReadingsCard: View {
                 .accessibilityIdentifier("report.reading.value")
             Text(verbatim: Checklist.unit(reading.metric).rawValue)
         }
-        Button(tr("Remove")) { model.edit { $0.readings.removeAll { $0.id == reading.id } } }.secondaryAction()
+        Button(tr("Remove"), role: .destructive) { model.edit { $0.readings.removeAll { $0.id == reading.id } } }.destructiveAction()
     }
 
     private func binding<Value>(_ id: UUID, _ path: WritableKeyPath<ReportDraft.Reading, Value>, default fallback: Value) -> Binding<Value>
@@ -235,7 +235,9 @@ struct PartsCard: View {
                 HStack {
                     Text(verbatim: "\(part.name) × \(Int(part.quantity)) · \(Checklist.label(part.source))")
                     Spacer()
-                    if model.isEditable { Button(tr("Remove")) { model.edit { $0.parts.remove(at: index) } }.secondaryAction() }
+                    if model.isEditable {
+                        Button(tr("Remove"), role: .destructive) { model.edit { $0.parts.remove(at: index) } }.destructiveAction()
+                    }
                 }
             }
             ForEach(Array(model.draft.refrigerant.enumerated()), id: \.offset) { index, record in
@@ -247,7 +249,9 @@ struct PartsCard: View {
                         )
                     )
                     Spacer()
-                    if model.isEditable { Button(tr("Remove")) { model.edit { $0.refrigerant.remove(at: index) } }.secondaryAction() }
+                    if model.isEditable {
+                        Button(tr("Remove"), role: .destructive) { model.edit { $0.refrigerant.remove(at: index) } }.destructiveAction()
+                    }
                 }
             }
             if model.isEditable {

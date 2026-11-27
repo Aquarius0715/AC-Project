@@ -58,12 +58,8 @@ struct JobsView: View {
                 }
                 if let line = model.answerLine {
                     Card {
-                        Label {
-                            Text(verbatim: line)
-                        } icon: {
-                            Image(symbol: .message).foregroundStyle(Palette.warn)
-                        }
-                        .accessibilityIdentifier("jobs.answer")
+                        StatusLabel(line, tone: .warn, symbol: .message)
+                            .accessibilityIdentifier("jobs.answer")
                     }
                 }
                 if !model.tiles.isEmpty {
@@ -107,16 +103,7 @@ struct JobsView: View {
             if rows.isEmpty { Text(verbatim: empty) }
             ForEach(rows) { row in
                 NavigationLink(value: row.jobId) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: Spacing.xs) {
-                            Text(verbatim: row.title).font(.headline)
-                            Text(verbatim: "\(row.badge) · \(row.sub)").font(.subheadline)
-                        }
-                        .multilineTextAlignment(.leading)
-                        Spacer(minLength: 0)
-                        Image(symbol: .disclosure).accessibilityHidden(true)
-                    }
-                    .foregroundStyle(.primary)
+                    DisclosureRow(title: row.title, details: ["\(row.badge) · \(row.sub)"])
                 }
                 .accessibilityIdentifier("overview.\(row.id)")
             }
@@ -130,17 +117,7 @@ struct JobsView: View {
             Card(title) {
                 ForEach(jobs) { job in
                     NavigationLink(value: job.id) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: Spacing.xs) {
-                                Text(verbatim: job.title).font(.headline)
-                                Text(verbatim: job.badge).font(.subheadline.weight(.semibold))
-                                Text(verbatim: job.line).font(.subheadline)
-                            }
-                            .multilineTextAlignment(.leading)
-                            Spacer(minLength: 0)
-                            Image(symbol: .disclosure).accessibilityHidden(true)
-                        }
-                        .foregroundStyle(.primary)
+                        DisclosureRow(title: job.title, status: job.badge, details: [job.line])
                     }
                     .accessibilityIdentifier("job.\(job.id)")
                 }

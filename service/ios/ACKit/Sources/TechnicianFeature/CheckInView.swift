@@ -117,12 +117,8 @@ struct CheckInView: View {
     @ViewBuilder
     private func error(_ field: CheckInField) -> some View {
         if let text = model.checkInErrors[field] {
-            Label {
-                Text(verbatim: text)
-            } icon: {
-                Image(symbol: .failed).foregroundStyle(Palette.critical)
-            }
-            .accessibilityIdentifier("checkIn.error.\(field.rawValue)")
+            StatusLabel.fieldError(text)
+                .accessibilityIdentifier("checkIn.error.\(field.rawValue)")
         }
     }
 }

@@ -38,6 +38,9 @@ struct JobDetailView: View {
         .hideTabBar()
         .task { await model.load() }
         .refreshable { await model.load() }
+        // a write's answer is felt as well as read (the system's haptics follow the user's settings)
+        .sensoryFeedback(trigger: model.note) { _, note in note == nil ? nil : .success }
+        .sensoryFeedback(trigger: model.refusal) { _, refusal in refusal == nil ? nil : .error }
         .sheet(item: $sheet) { sheet in
             switch sheet {
             case .checkIn: CheckInView(model: model) { self.sheet = nil }
@@ -50,21 +53,13 @@ struct JobDetailView: View {
     private func workCards(_ work: JobDetailModel.Work) -> some View {
         if let note = model.note {
             Card {
-                Label {
-                    Text(verbatim: note)
-                } icon: {
-                    Image(symbol: .success)
-                }.accessibilityIdentifier("job.note")
+                StatusLabel(note, tone: .ok).accessibilityIdentifier("job.note")
             }
         }
         if let refusal = model.refusal {
             Card {
-                Label {
-                    Text(verbatim: refusal)
-                } icon: {
-                    Image(symbol: .warning)
-                }
-                .accessibilityIdentifier("job.refusal")
+                StatusLabel(refusal, tone: .critical)
+                    .accessibilityIdentifier("job.refusal")
             }
         }
         ForEach(Array(model.banners.enumerated()), id: \.offset) { _, banner in
@@ -140,12 +135,7 @@ struct JobDetailView: View {
 
     @ViewBuilder
     private func bannerContent(_ banner: JobDetailModel.Banner) -> some View {
-        Label {
-            Text(verbatim: banner.text)
-        } icon: {
-            Image(symbol: banner.tone.symbol).foregroundStyle(banner.tone.color)
-        }
-        .accessibilityIdentifier("job.banner")
+        StatusLabel(banner.text, tone: banner.tone).accessibilityIdentifier("job.banner")
         switch banner.action {
         case .acknowledge?:
             HStack {

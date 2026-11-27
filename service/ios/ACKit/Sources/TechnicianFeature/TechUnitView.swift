@@ -43,11 +43,7 @@ struct TechUnitView: View {
     @ViewBuilder private var unitCards: some View {
         if let stopped = model.stopped {
             Card {
-                Label {
-                    Text(verbatim: stopped)
-                } icon: {
-                    Image(symbol: .offline).foregroundStyle(Palette.critical)
-                }
+                StatusLabel(stopped, tone: .critical, symbol: .offline)
             }
         }
         Card {
@@ -92,14 +88,7 @@ struct TechUnitView: View {
                 NavigationLink {
                     AlertsView(model: AlertsModel(unitId: model.unitId, jobId: model.jobId, alertId: row.id, client: model.client))
                 } label: {
-                    VStack(alignment: .leading, spacing: Spacing.xxs) {
-                        Text(verbatim: row.title).font(.headline)
-                        Text(verbatim: row.badge).font(.subheadline.weight(.semibold))
-                        Text(verbatim: row.sub).font(.subheadline)
-                    }
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .foregroundStyle(.primary)
+                    DisclosureRow(title: row.title, status: row.badge, details: [row.sub])
                 }
                 .accessibilityIdentifier("unit.alerts.\(row.id)")
             }
@@ -126,7 +115,7 @@ struct TechUnitView: View {
         Card(tr("Time-series monitoring")) {
             ForEach(Array(model.tiles.enumerated()), id: \.offset) { _, tile in
                 VStack(alignment: .leading, spacing: Spacing.xxs) {
-                    Text(verbatim: tile.label).font(.subheadline.weight(.semibold))
+                    Text(verbatim: tile.label).font(.factLabel)
                     Text(verbatim: tile.value).font(.title3)
                     Text(verbatim: tile.sub).font(.footnote)
                 }
@@ -197,7 +186,7 @@ struct TechUnitView: View {
         ForEach(rows) { row in
             VStack(alignment: .leading, spacing: Spacing.xxs) {
                 Text(verbatim: row.title).font(.headline)
-                Text(verbatim: row.badge).font(.subheadline.weight(.semibold))
+                Text(verbatim: row.badge).font(.factLabel)
                 if !row.sub.isEmpty { Text(verbatim: row.sub).font(.subheadline) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

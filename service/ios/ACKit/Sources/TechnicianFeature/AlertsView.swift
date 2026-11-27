@@ -34,28 +34,20 @@ struct AlertsView: View {
     @ViewBuilder private var alertCards: some View {
         if let note = model.note {
             Card {
-                Label {
-                    Text(verbatim: note)
-                } icon: {
-                    Image(symbol: .success)
-                }.accessibilityIdentifier("alerts.note")
+                StatusLabel(note, tone: .ok).accessibilityIdentifier("alerts.note")
             }
         }
         if let refusal = model.refusal {
             Card {
-                Label {
-                    Text(verbatim: refusal)
-                } icon: {
-                    Image(symbol: .warning)
-                }
-                .accessibilityIdentifier("alerts.refusal")
+                StatusLabel(refusal, tone: .critical)
+                    .accessibilityIdentifier("alerts.refusal")
             }
         }
         if let view = model.view, let alert = model.selected {
             Card(view.title) {
                 Text(verbatim: view.subtitle).font(.subheadline)
                 if let state = view.state {
-                    Text(verbatim: state).font(.subheadline.weight(.semibold)).accessibilityIdentifier("alerts.state")
+                    Text(verbatim: state).font(.factLabel).accessibilityIdentifier("alerts.state")
                 }
                 Facts(rows: view.evidence)
             }
