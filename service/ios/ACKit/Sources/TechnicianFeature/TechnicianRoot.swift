@@ -69,7 +69,17 @@ struct JobsView: View {
                 }
                 let jobs = model.jobs.value ?? []
                 section(tr("Open jobs"), jobs.filter { !$0.isPast })
-                section(tr("Job history"), jobs.filter(\.isPast))
+                let past = jobs.filter(\.isPast)
+                if !past.isEmpty {
+                    // the past jobs on a screen of their own: the list is for the work to do
+                    NavigationLink {
+                        JobHistoryView(jobs: past)
+                    } label: {
+                        Label(tr("Job history") + " (\(past.count))", symbol: .history).frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .linkAction()
+                    .accessibilityIdentifier("jobs.history")
+                }
                 if case .loaded = model.jobs {
                     overviewSection(
                         tr("Alerts on my units ({n})", ["n": String(model.alerts.count)]),
@@ -113,15 +123,36 @@ struct JobsView: View {
 
     @ViewBuilder
     private func section(_ title: String, _ jobs: [JobsModel.Row]) -> some View {
-        if !jobs.isEmpty {
-            Card(title) {
-                ForEach(jobs) { job in
-                    NavigationLink(value: job.id) {
-                        DisclosureRow(title: job.title, status: job.badge, details: [job.line])
-                    }
-                    .accessibilityIdentifier("job.\(job.id)")
+        if !jobs.isEmpty { JobRows(title: title, jobs: jobs) }
+    }
+}
+
+/// A card of job rows, each opening its job.
+struct JobRows: View {
+    let title: String
+    let jobs: [JobsModel.Row]
+
+    var body: some View {
+        Card(title) {
+            ForEach(jobs) { job in
+                NavigationLink(value: job.id) {
+                    DisclosureRow(title: job.title, status: job.badge, details: [job.line])
                 }
+                .accessibilityIdentifier("job.\(job.id)")
             }
         }
+    }
+}
+
+/// The technician's past assignments (the jobs list keeps the open ones); a row opens through the jobs list's stack.
+struct JobHistoryView: View {
+    let jobs: [JobsModel.Row]
+
+    var body: some View {
+        JobRows(title: tr("Job history"), jobs: jobs)
+            .cardScreen()
+            .navigationTitle(Text(verbatim: tr("Job history")))
+            .inlineTitle()
+            .hideTabBar()
     }
 }

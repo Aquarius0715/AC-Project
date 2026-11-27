@@ -9822,6 +9822,29 @@
         }
       }
     },
+    "More actions": {
+      "extractionState": "manual",
+      "localizations": {
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tindakan lain"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "その他の操作"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tindakan lainnya"
+          }
+        }
+      }
+    },
     "Mounting": {
       "extractionState": "manual",
       "localizations": {
@@ -15407,29 +15430,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Berjalan — berakhir {end} (awal dikonfirmasi {start})"
-          }
-        }
-      }
-    },
-    "Save draft": {
-      "extractionState": "manual",
-      "localizations": {
-        "ms": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Simpan draf"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "下書きを保存"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Simpan draf"
           }
         }
       }

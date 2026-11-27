@@ -46,12 +46,12 @@ struct TechUnitView: View {
                 StatusLabel(stopped, tone: .critical, symbol: .offline)
             }
         }
-        Card {
-            HStack {
-                choice(.register, tr("Register"), id: "unit.tab.register")
-                choice(.monitoring, tr("Monitoring"), id: "unit.tab.monitoring")
-            }
+        Picker(tr("Unit"), selection: $tab) {
+            Text(verbatim: tr("Register")).tag(Tab.register)
+            Text(verbatim: tr("Monitoring")).tag(Tab.monitoring)
         }
+        .pickerStyle(.segmented)
+        .accessibilityIdentifier("unit.tabs")
         if tab == .register {
             Card(tr("Unit register")) {
                 Facts(rows: model.register)
@@ -99,18 +99,6 @@ struct TechUnitView: View {
         }
     }
 
-    private func choice(_ value: Tab, _ title: String, id: String) -> some View {
-        Group {
-            if tab == value {
-                Button(title) { tab = value }.primaryAction()
-            } else {
-                Button(title) { tab = value }.secondaryAction()
-            }
-        }
-        .accessibilityIdentifier(id)
-        .accessibilityAddTraits(tab == value ? .isSelected : [])
-    }
-
     @ViewBuilder private var tilesCard: some View {
         Card(tr("Time-series monitoring")) {
             ForEach(Array(model.tiles.enumerated()), id: \.offset) { _, tile in
@@ -127,15 +115,10 @@ struct TechUnitView: View {
 
     @ViewBuilder private var chartCard: some View {
         Card(model.chartTitle) {
-            HStack {
-                ForEach(SeriesPeriod.allCases, id: \.self) { period in
-                    if model.period == period {
-                        Button(period.label) { Task { await model.show(period) } }.primaryAction()
-                    } else {
-                        Button(period.label) { Task { await model.show(period) } }.secondaryAction()
-                    }
-                }
+            Picker(model.chartTitle, selection: Binding(get: { model.period }, set: { period in Task { await model.show(period) } })) {
+                ForEach(SeriesPeriod.allCases, id: \.self) { Text(verbatim: $0.label).tag($0) }
             }
+            .pickerStyle(.segmented)
             .accessibilityIdentifier("unit.periods")
             if model.lines.allSatisfy(\.points.isEmpty) {
                 Text(verbatim: tr("No measurements yet")).accessibilityIdentifier("unit.chart.empty")

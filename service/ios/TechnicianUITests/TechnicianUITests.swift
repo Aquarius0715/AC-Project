@@ -64,16 +64,16 @@ final class TechnicianUITests: XCTestCase {
         let submit = app.buttons["checkIn.submit"]
         XCTAssertTrue(submit.waitForExistence(timeout: 5))
         try app.audit()
-        tapScrolling(submit, in: app)
-        XCTAssertTrue(app.staticTexts["checkIn.error.position"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["checkIn.error.qr"].exists)
-        tapScrolling(app.buttons["checkIn.locate"], in: app)
+        // the fix is taken as the sheet opens; the label is the one thing to scan
         XCTAssertTrue(
             wait(
                 for: app.staticTexts["checkIn.positionHint"],
                 label: "Found, accurate to ±12 m — the server checks you are within 200 m of the site"
             )
         )
+        tapScrolling(submit, in: app)
+        XCTAssertTrue(app.staticTexts["checkIn.error.qr"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["checkIn.error.position"].exists, "the fix is there")
 
         // another unit's label is refused under the QR field
         let qr = field("checkIn.qr", in: app)
@@ -91,16 +91,13 @@ final class TechnicianUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["In progress"].exists || app.navigationBars.staticTexts.firstMatch.label.contains("In progress"))
 
         // the time on site is paused and resumed
-        let pause = app.buttons["job.pause"]
-        tapScrolling(pause, in: app)
-        XCTAssertTrue(wait(for: app.staticTexts["job.note"], label: "Work paused"))
-        XCTAssertTrue(wait(for: pause, label: "Resume work"))
+        pauseWork(in: app)
         // audited from the top, as the screen opens: an audit at the foot of a long screen scrolls it while it checks,
         // and its pictures of the moving text fail their contrast
         scrollToTop(app)
         try app.audit()
         keepScreenshot("job-paused", of: app)
-        tapScrolling(pause, in: app)
+        tapScrolling(app.buttons["job.resume"], in: app)
         XCTAssertTrue(wait(for: app.staticTexts["job.note"], label: "Work resumed"))
     }
 
@@ -118,6 +115,26 @@ final class TechnicianUITests: XCTestCase {
         tapScrolling(app.buttons["checkIn.submit"], in: app)
         XCTAssertTrue(wait(for: app.staticTexts["job.note"], label: "Checked in — the job has started"))
         return app
+    }
+
+    /// Pauses the work from the job's menu: its primary button is then Resume work.
+    @MainActor
+    private func pauseWork(in app: XCUIApplication) {
+        tapScrolling(app.buttons["job.more"].firstMatch, in: app)
+        let pause = app.buttons["Pause work"].firstMatch
+        XCTAssertTrue(pause.waitForExistence(timeout: 5))
+        pause.tap()
+        XCTAssertTrue(wait(for: app.staticTexts["job.note"], label: "Work paused"))
+        XCTAssertTrue(app.buttons["job.resume"].waitForExistence(timeout: 5), "resuming is the primary step")
+    }
+
+    /// Opens the job's unit and, from it, one of its screens.
+    @MainActor
+    private func openFromUnit(_ id: String, in app: XCUIApplication) {
+        tapScrolling(app.buttons["job.unit"], in: app)
+        let link = app.descendants(matching: .any)[id].firstMatch
+        XCTAssertTrue(link.waitForExistence(timeout: 5))
+        tapScrolling(link, in: app)
     }
 
     /// Chooses a result in a checklist row's menu.
@@ -150,7 +167,10 @@ final class TechnicianUITests: XCTestCase {
         tapScrolling(app.buttons["report.reading.add"], in: app)
         type("12.5", into: field("report.reading.value", in: app), in: app)
 
-        tapScrolling(app.buttons["report.part.add"], in: app)
+        tapScrolling(app.buttons["report.add"].firstMatch, in: app)
+        let addPart = app.buttons["Add part"].firstMatch
+        XCTAssertTrue(addPart.waitForExistence(timeout: 5))
+        addPart.tap()
         let catalog = app.buttons["part.catalog"]
         XCTAssertTrue(catalog.waitForExistence(timeout: 5))
         catalog.tap()
@@ -159,13 +179,7 @@ final class TechnicianUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Filter F-200 × 1 · Van stock"].waitForExistence(timeout: 5))
 
         type("Cleaned the filter and checked the drain.", into: field("report.workText", in: app), in: app)
-        tapScrolling(app.buttons["report.save"], in: app)
-        XCTAssertTrue(wait(for: app.staticTexts["report.note"], label: "Draft saved"))
-        let version = app.descendants(matching: .any)["report.version"].firstMatch
-        // any draft version: when typing is slow (a loaded machine), autosave has already saved v1 and v2 before this save
-        let isSaved = NSPredicate(format: "label MATCHES %@", "(?s)Draft v[0-9]+ · saved .*")
-        let saved = XCTNSPredicateExpectation(predicate: isSaved, object: version)
-        XCTAssertEqual(XCTWaiter().wait(for: [saved], timeout: 15), .completed, "the saved draft in the versions card: \(version.label)")
+        // no Save button: the sign-off saves the draft first (autosave may have saved a version before)
 
         // the customer signs on the phone
         tapScrolling(app.buttons["report.signOff"], in: app)
@@ -183,6 +197,10 @@ final class TechnicianUITests: XCTestCase {
         tapScrolling(app.buttons["signOff.save"], in: app)
         XCTAssertTrue(wait(for: app.staticTexts["report.note"], label: "Sign-off saved for this report version"))
         XCTAssertTrue(app.staticTexts["report.signed"].label.hasPrefix("Signed · Ms Tan · "))
+        let version = app.descendants(matching: .any)["report.version"].firstMatch
+        let isSaved = NSPredicate(format: "label MATCHES %@", "(?s)Draft v[0-9]+ · saved .*")
+        let saved = XCTNSPredicateExpectation(predicate: isSaved, object: version)
+        XCTAssertEqual(XCTWaiter().wait(for: [saved], timeout: 15), .completed, "the saved draft in the versions card: \(version.label)")
 
         tapScrolling(submit, in: app)
         let confirm = app.buttons["report.submit.confirm"].firstMatch
@@ -205,12 +223,12 @@ final class TechnicianUITests: XCTestCase {
     func testTheUnitShowsItsRegisterAndItsMonitoring() throws {
         let app = openJob()
         tapScrolling(app.buttons["job.unit"], in: app)
-        XCTAssertTrue(app.buttons["unit.tab.monitoring"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Monitoring"].firstMatch.waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Location, Home A › Living room"].exists || app.staticTexts["Home A › Living room"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["unit.alerts.al1"].waitForExistence(timeout: 5), "the open alert")
         try app.audit()
         keepScreenshot("unit-register", of: app)
-        app.buttons["unit.tab.monitoring"].tap()
+        app.buttons["Monitoring"].firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any)["unit.chart"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["24.5 °C"].exists, "the latest temperature")
         try app.audit()
@@ -222,7 +240,7 @@ final class TechnicianUITests: XCTestCase {
     @MainActor
     func testAnAlertIsAcknowledgedThenResolvedWithItsEvidence() throws {
         let app = openJob()
-        tapScrolling(app.buttons["job.alerts"], in: app)
+        openFromUnit("unit.alerts.al1", in: app)
         let acknowledge = app.buttons["alerts.acknowledge"]
         XCTAssertTrue(acknowledge.waitForExistence(timeout: 5))
         try app.audit()
@@ -249,7 +267,7 @@ final class TechnicianUITests: XCTestCase {
     @MainActor
     func testADiagnosticCommandAndATestRunAreSentForTheJob() throws {
         let app = openJob()
-        tapScrolling(app.buttons["job.diagnostics"], in: app)
+        openFromUnit("unit.diagnostics", in: app)
         let send = app.buttons["control.send"]
         XCTAssertTrue(send.waitForExistence(timeout: 5))
         try app.audit()
@@ -319,8 +337,11 @@ final class TechnicianUITests: XCTestCase {
     @MainActor
     func testCantMakeIsSentWithItsReason() throws {
         let app = openJob()
-        XCTAssertTrue(app.buttons["job.cantMake"].waitForExistence(timeout: 5))
-        app.buttons["job.cantMake"].tap()
+        XCTAssertTrue(app.buttons["job.more"].firstMatch.waitForExistence(timeout: 5))
+        app.buttons["job.more"].firstMatch.tap()
+        let cantMake = app.buttons["Can’t make this time…"].firstMatch
+        XCTAssertTrue(cantMake.waitForExistence(timeout: 5))
+        cantMake.tap()
         let send = app.buttons["cantMake.send"]
         XCTAssertTrue(send.waitForExistence(timeout: 5))
         try app.audit()
@@ -413,12 +434,9 @@ final class TechnicianUITests: XCTestCase {
         type("No GPS signal in the plant room", into: field("checkIn.reason", in: app), in: app)
         tapScrolling(app.buttons["checkIn.submit"], in: app)
         XCTAssertTrue(wait(for: app.staticTexts["job.note"], label: "Checked in — the job has started"))
-        let pause = app.buttons["job.pause"]
-        tapScrolling(pause, in: app)
-        XCTAssertTrue(wait(for: app.staticTexts["job.note"], label: "Work paused"))
-        XCTAssertTrue(wait(for: pause, label: "Resume work"))
+        pauseWork(in: app)
         keepScreenshot("live-job-paused", of: app)
-        tapScrolling(pause, in: app)
+        tapScrolling(app.buttons["job.resume"], in: app)
         XCTAssertTrue(wait(for: app.staticTexts["job.note"], label: "Work resumed"))
     }
 
@@ -454,8 +472,6 @@ final class TechnicianUITests: XCTestCase {
         ]
         for key in keys { choose("Normal", for: key, in: app) }
         type("Cleaned the filters and checked every component.", into: field("report.workText", in: app), in: app)
-        tapScrolling(app.buttons["report.save"], in: app)
-        XCTAssertTrue(wait(for: app.staticTexts["report.note"], label: "Draft saved"))
         tapScrolling(app.buttons["report.signOff"], in: app)
         type("Ms Tan", into: field("signOff.name", in: app), in: app)
         let pad = app.descendants(matching: .any)["signOff.pad"]

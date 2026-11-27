@@ -105,6 +105,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 0.654.0 (2026-11-16): IR811: from Turn off running ACs, one link opens an after-hours rule with the same ACs.
 0.657.0 (2026-11-16): IR814: a customer pins ACs to the Overview from their pages (this browser only).
 0.658.0 (2026-11-16): IR815: Energy & cost opens on the AC that used the most in the period.
+0.695.0 (2026-11-27): IR885 (DEC-112): AC Technician has one primary button per job state with the other steps in a menu, one Unit link, open jobs with a Job history link, a check-in that takes the fix by itself, an autosaved report without Save draft, one Add menu, and segmented choices.
 0.694.0 (2026-11-27): IR884 (DEC-112): the iOS apps' design system: colour, spacing, symbol and tone tokens of both appearances, shared components and button kinds, SwiftLint rules that refuse raw values, and the accessibility audit in Dark Mode too ([iOS design system](03-uiux/ios-design-system.md)).
 0.687.0 (2026-11-26): IR881 (DEC-112): AC Customer sends a change a moment after the last tap without a confirmation (with its undo), switches the power with one tap, folds the command history, and has a Settings tab with one location switch (it also records the consent) and Sign out.
 0.686.0 (2026-11-21): IR870 (DEC-112): AC Technician shows the overview over its jobs (tiles, alerts on its units, reports by state), the report's versions with their reviews, and opens a report photo.

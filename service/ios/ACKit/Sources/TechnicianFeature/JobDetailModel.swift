@@ -333,6 +333,33 @@ extension JobDetailModel {
         return banners
     }
 
+    /// A step the job screen offers: one is the primary action at the foot of the screen, the others wait in its menu.
+    public enum Step: Sendable, Hashable {
+        case accept, cantMake, checkIn(enabled: Bool), resumeRework(enabled: Bool), report, pause, resume
+    }
+
+    /// The one step the job's state asks for now (the screen's single primary button), or nil when there is none.
+    public var primaryStep: Step? { steps.first }
+
+    /// The other steps of the state, in the primary button's menu.
+    public var moreSteps: [Step] { Array(steps.dropFirst()) }
+
+    /// The steps of the state, the one it asks for first.
+    private var steps: [Step] {
+        guard work != nil else { return [] }
+        for banner in banners {
+            switch banner.action {
+            case .acknowledge?: return [.accept, .cantMake]
+            case let .checkIn(enabled)?: return [.checkIn(enabled: enabled)]
+            case let .resumeRework(enabled)?: return [.resumeRework(enabled: enabled)]
+            case nil: continue
+            }
+        }
+        if isInWork, isPaused { return canPause ? [.resume, .report] : [.report] }
+        if isInWork { return canPause ? [.report, .pause] : [.report] }
+        return hasReport ? [.report] : []
+    }
+
     /// The job and its unit, as the web's Job & unit card lists them.
     public var facts: [(String, String)] {
         guard let work else { return [] }

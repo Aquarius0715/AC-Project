@@ -40,6 +40,8 @@ struct JobDetailView: View {
         .refreshable { await model.load() }
         // a write's answer is felt as well as read
         .writeFeedback(note: model.note, refusal: model.refusal)
+        // the one step the state asks for, at the foot of the screen where the thumb is; the others in its menu
+        .safeAreaInset(edge: .bottom) { actionBar }
         .sheet(item: $sheet) { sheet in
             switch sheet {
             case .checkIn: CheckInView(model: model) { self.sheet = nil }
@@ -71,14 +73,6 @@ struct JobDetailView: View {
         }
         Card(tr("Time on site")) {
             Facts(rows: model.timeRows)
-            if model.isInWork {
-                Button(model.isPaused ? tr("Resume work") : tr("Pause work")) {
-                    Task { await model.setPaused(!model.isPaused) }
-                }
-                .secondaryAction()
-                .disabled(model.isSending || !model.canPause)
-                .accessibilityIdentifier("job.pause")
-            }
             Text(
                 verbatim: tr(
                     "Arrival inside the window counts toward the SLA. Times are part of the report and visible to the contractor and HQ."
@@ -88,7 +82,7 @@ struct JobDetailView: View {
         }
     }
 
-    /// The job and its unit, with the unit's screen.
+    /// The job and its unit, with the unit's screen (its readings, open alerts and diagnostics are there).
     private func jobCard(_ work: JobDetailModel.Work) -> some View {
         Card(tr("Job & unit")) {
             Facts(rows: model.facts)
@@ -99,66 +93,86 @@ struct JobDetailView: View {
             }
             .linkAction()
             .accessibilityIdentifier("job.unit")
-            NavigationLink {
-                AlertsView(model: AlertsModel(unitId: work.job.unitId, jobId: work.job.id, alertId: nil, client: model.client))
-            } label: {
-                Label(tr("Alert evidence"), symbol: .alertEvidence)
-            }
-            .linkAction()
-            .accessibilityIdentifier("job.alerts")
-            NavigationLink {
-                ControlView(model: ControlModel(unitId: work.job.unitId, jobId: work.job.id, client: model.client))
-            } label: {
-                Label(tr("Diagnostics"), symbol: .diagnostics)
-            }
-            .linkAction()
-            .accessibilityIdentifier("job.diagnostics")
         }
     }
 
+    /// Before the check-in, where the report will be; afterwards the report is a step of the action bar.
     @ViewBuilder private var reportCard: some View {
-        Card(tr("Work report")) {
-            if let report = model.report() {
-                NavigationLink {
-                    ReportView(model: report)
-                } label: {
-                    Label(tr("Open the work report"), symbol: .report)
+        if !model.hasReport {
+            Card(tr("Work report")) { Text(verbatim: tr("The report opens when you check in at the site.")) }
+        }
+    }
+
+    /// The primary step of the job's state, full width, with the menu of its other steps.
+    @ViewBuilder private var actionBar: some View {
+        if let step = model.primaryStep, model.work != nil {
+            HStack(spacing: Spacing.s) {
+                stepButton(step)
+                if !model.moreSteps.isEmpty {
+                    Menu {
+                        ForEach(model.moreSteps, id: \.self) { stepButton($0, inMenu: true) }
+                    } label: {
+                        Image(symbol: .more).frame(minWidth: Size.minTap, minHeight: Size.minTap)
+                    }
+                    .secondaryAction()
+                    .accessibilityLabel(Text(verbatim: tr("More actions")))
+                    .accessibilityIdentifier("job.more")
                 }
-                .linkAction()
-                .accessibilityIdentifier("job.report")
-            } else {
-                Text(verbatim: tr("The report opens when you check in at the site."))
+            }
+            .padding(Spacing.l)
+            .background(Palette.surface)
+            .disabled(model.isSending)
+        }
+    }
+
+    /// The button of one step: in the bar, the full-width primary button; in the menu, its line.
+    @ViewBuilder
+    private func stepButton(_ step: JobDetailModel.Step, inMenu: Bool = false) -> some View {
+        let button = Group {
+            switch step {
+            case .accept:
+                button(tr("Accept assignment"), id: "job.accept", inMenu) { Task { await model.accept() } }
+            case .cantMake:
+                button(tr("Can’t make this time…"), id: "job.cantMake", inMenu) { sheet = .cantMake }
+            case let .checkIn(enabled):
+                button(tr("Start job (check in)"), id: "job.checkIn", inMenu) { sheet = .checkIn }.disabled(!enabled)
+            case let .resumeRework(enabled):
+                button(tr("Resume rework"), id: "job.resumeRework", inMenu) { Task { await model.resumeRework() } }
+                    .disabled(!enabled)
+            case .report:
+                reportLink(inMenu)
+            case .pause:
+                button(tr("Pause work"), id: "job.pause", inMenu) { Task { await model.setPaused(true) } }
+            case .resume:
+                button(tr("Resume work"), id: "job.resume", inMenu) { Task { await model.setPaused(false) } }
             }
         }
+        if inMenu { button } else { button.primaryAction() }
+    }
+
+    /// A step's button; in the bar its label takes the bar's width (a bordered button is as wide as its label).
+    private func button(_ title: String, id: String, _ inMenu: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(verbatim: title).frame(maxWidth: inMenu ? nil : .infinity, minHeight: inMenu ? nil : Size.minTap)
+        }
+        .accessibilityIdentifier(id)
     }
 
     @ViewBuilder
+    private func reportLink(_ inMenu: Bool) -> some View {
+        if let report = model.report() {
+            NavigationLink {
+                ReportView(model: report)
+            } label: {
+                Label(tr("Open the work report"), symbol: .report)
+                    .frame(maxWidth: inMenu ? nil : .infinity, minHeight: inMenu ? nil : Size.minTap)
+            }
+            .accessibilityIdentifier("job.report")
+        }
+    }
+
     private func bannerContent(_ banner: JobDetailModel.Banner) -> some View {
         StatusLabel(banner.text, tone: banner.tone).accessibilityIdentifier("job.banner")
-        switch banner.action {
-        case .acknowledge?:
-            HStack {
-                Button(tr("Accept assignment")) { Task { await model.accept() } }
-                    .primaryAction()
-                    .accessibilityIdentifier("job.accept")
-                Button(tr("Can’t make this time…")) { sheet = .cantMake }
-                    .secondaryAction()
-                    .accessibilityIdentifier("job.cantMake")
-            }
-            .disabled(model.isSending)
-        case let .checkIn(enabled)?:
-            Button(tr("Start job (check in)")) { sheet = .checkIn }
-                .primaryAction()
-                .disabled(model.isSending || !enabled)
-                .accessibilityIdentifier("job.checkIn")
-        case let .resumeRework(enabled)?:
-            Button(tr("Resume rework")) { Task { await model.resumeRework() } }
-                .primaryAction()
-                .disabled(model.isSending || !enabled)
-                .accessibilityIdentifier("job.resumeRework")
-        case nil:
-            EmptyView()
-        }
     }
 }
 

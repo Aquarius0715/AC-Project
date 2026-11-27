@@ -142,10 +142,12 @@ struct SignOffSheet: View {
                         .accessibilityIdentifier("signOff.name")
                 }
                 Card(tr("How")) {
-                    HStack {
-                        choice(false, tr("Signature"), id: "signOff.method.sign")
-                        choice(true, tr("Customer not available"), id: "signOff.method.absent")
+                    Picker(tr("Customer sign-off"), selection: $isAbsent) {
+                        Text(verbatim: tr("Signature")).tag(false)
+                        Text(verbatim: tr("Customer not available")).tag(true)
                     }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("signOff.method")
                     if isAbsent {
                         TextField(tr("Why the customer could not sign"), text: $reason, axis: .vertical)
                             .textFieldStyle(.roundedBorder)
@@ -201,17 +203,5 @@ struct SignOffSheet: View {
                 }
             }
         }
-    }
-
-    private func choice(_ absent: Bool, _ title: String, id: String) -> some View {
-        Group {
-            if isAbsent == absent {
-                Button(title) { isAbsent = absent }.primaryAction()
-            } else {
-                Button(title) { isAbsent = absent }.secondaryAction()
-            }
-        }
-        .accessibilityIdentifier(id)
-        .accessibilityAddTraits(isAbsent == absent ? .isSelected : [])
     }
 }
