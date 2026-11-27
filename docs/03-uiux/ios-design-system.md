@@ -79,7 +79,7 @@ SF Symbols only, named by meaning: `Image(symbol: .warning)`, `Label(title, symb
 | Primary | `.primaryAction()` | The one action a screen or card is for (Sign in, Start job, Submit, Try again). At most one in view. Also the chosen one of a row of filter or choice buttons, with the selected trait (where a segmented Picker does not fit) |
 | Secondary | `.secondaryAction()` | Every other action, an unchosen filter |
 | Link | `.linkAction()` | A NavigationLink shown as a button |
-| Destructive | `.destructiveAction()` with `role: .destructive` | Ends or removes something; one that removes data asks first in a confirmationDialog whose safe choice is Cancel |
+| Destructive | `.destructiveAction()` with `role: .destructive` | Ends or removes something; one that removes saved data asks first in a confirmationDialog whose safe choice is Cancel (a line of an unsaved draft is removed at once) |
 | Plain | `.buttonStyle(.plain)` | A whole card that is tappable (a notification) |
 
 No toolbar buttons for actions in the content (the audit refused their contrast on iOS 26's glass bar); a sheet's Close/Cancel is the exception. A disabled button stays visible with the system's dimming, and the reason is written beside it when it is not obvious (offline, sending).
@@ -105,7 +105,7 @@ A new shared component is added when the same composition appears on two screens
 
 ## 5. UI/UX rules for screens
 
-As built in IR884 every screen takes its values from the tokens. The Customer app and the shared screens (sign-in, notifications) use the components: the AC list is cards of `DisclosureRow`s, the AC screen's offline, restriction, blocked, sending and outcome lines are `StatusLabel`s, a send's answer gives its haptic, and withdrawing the location consent is a destructive action. The Technician app follows. A new screen follows these rules from the start.
+As built in IR884 every screen takes its values from the tokens. The Customer app and the shared screens (sign-in, notifications) use the components: the AC list is cards of `DisclosureRow`s, the AC screen's offline, restriction, blocked, sending and outcome lines are `StatusLabel`s, a send's answer gives its haptic, and withdrawing the location consent is a destructive action. In the Technician app the rows that open a job, an alert or a device are `DisclosureRow`s, every write's note and refusal and the job banners are `StatusLabel`s (a refusal critical), the fields' and the report's blocking issues are `StatusLabel.fieldError`s, the job screen gives a write's success or error haptic and the report screen its error haptic (its draft saves itself, so no success haptic), and Remove in a draft is a destructive action. A new screen follows these rules from the start.
 
 **Navigation.** A TabView of three tabs at most per app, each tab its own NavigationStack; detail screens are pushed (`navigationDestination`) and hide the tab bar. A sheet is for a short task that returns to the same screen (check in, add a part, sign off), with Cancel/Close; a full-screen cover only for the camera. Back is always the system's back button and edge swipe; a screen never navigates by itself after an action. Titles are inline.
 

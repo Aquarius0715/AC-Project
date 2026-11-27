@@ -55,6 +55,8 @@ struct ReportView: View {
         .inlineTitle()
         .hideTabBar()
         .task { await model.load() }
+        // a refusal is felt as well as read; no success haptic here: the draft saves itself every 20 s
+        .sensoryFeedback(.error, trigger: model.refusal) { _, new in new != nil }
         .sheet(item: $shown) { photo in
             NavigationStack {
                 PhotoImage(data: photo.data, name: photo.name)
@@ -143,28 +145,20 @@ struct ReportView: View {
     @ViewBuilder private var lines: some View {
         if let note = model.note {
             Card {
-                Label {
-                    Text(verbatim: note)
-                } icon: {
-                    Image(symbol: .success)
-                }.accessibilityIdentifier("report.note")
+                StatusLabel(note, tone: .ok).accessibilityIdentifier("report.note")
             }
         }
         if let refusal = model.refusal {
             Card {
-                Label {
-                    Text(verbatim: refusal)
-                } icon: {
-                    Image(symbol: .warning)
-                }
-                .accessibilityIdentifier("report.refusal")
+                StatusLabel(refusal, tone: .critical)
+                    .accessibilityIdentifier("report.refusal")
             }
         }
         if let error = model.photoError {
             Card { Text(verbatim: error).accessibilityIdentifier("report.photoError") }
         }
         if model.isLoading { ProgressView() }
-        if model.isDirty { Text(verbatim: tr("Unsaved changes")).font(.subheadline.weight(.semibold)) }
+        if model.isDirty { Text(verbatim: tr("Unsaved changes")).font(.factLabel) }
     }
 
     @ViewBuilder private var photosCard: some View {
@@ -186,8 +180,8 @@ struct ReportView: View {
                     .accessibilityIdentifier("report.photo.open.\(photo.id)")
                     Spacer()
                     if model.isEditable {
-                        Button(tr("Remove")) { model.removePhoto(photo.id) }
-                            .secondaryAction()
+                        Button(tr("Remove"), role: .destructive) { model.removePhoto(photo.id) }
+                            .destructiveAction()
                             .accessibilityIdentifier("report.photo.remove.\(photo.id)")
                     }
                 }
@@ -245,14 +239,10 @@ struct ReportView: View {
                         ? tr("1 issue blocks submit — it is listed above Submit report.")
                         : tr("{n} issues block submit — they are listed above Submit report.", ["n": String(issues.count)])
                 )
-                .font(.subheadline.weight(.semibold))
+                .font(.factLabel)
                 .accessibilityIdentifier("report.issues")
                 ForEach(Array(issues.enumerated()), id: \.offset) { _, issue in
-                    Label {
-                        Text(verbatim: issue.text)
-                    } icon: {
-                        Image(symbol: .failed).foregroundStyle(Palette.critical)
-                    }
+                    StatusLabel.fieldError(issue.text)
                 }
             }
             HStack {

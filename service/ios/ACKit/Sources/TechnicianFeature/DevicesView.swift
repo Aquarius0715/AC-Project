@@ -35,13 +35,7 @@ struct DevicesView: View {
                         NavigationLink {
                             DeviceView(model: DeviceModel(deviceId: row.id, client: model.client))
                         } label: {
-                            VStack(alignment: .leading, spacing: Spacing.xxs) {
-                                Text(verbatim: row.title).font(.headline)
-                                Text(verbatim: row.sub).font(.subheadline)
-                            }
-                            .multilineTextAlignment(.leading)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .foregroundStyle(.primary)
+                            DisclosureRow(title: row.title, details: [row.sub])
                         }
                         .accessibilityIdentifier("device.\(row.id)")
                     }
@@ -123,21 +117,13 @@ struct DeviceView: View {
             if let message = model.device.message { Card { Text(verbatim: message).accessibilityIdentifier("device.message") } }
             if let note = model.note {
                 Card {
-                    Label {
-                        Text(verbatim: note)
-                    } icon: {
-                        Image(symbol: .success)
-                    }.accessibilityIdentifier("device.note")
+                    StatusLabel(note, tone: .ok).accessibilityIdentifier("device.note")
                 }
             }
             if let refusal = model.refusal {
                 Card {
-                    Label {
-                        Text(verbatim: refusal)
-                    } icon: {
-                        Image(symbol: .warning)
-                    }
-                    .accessibilityIdentifier("device.refusal")
+                    StatusLabel(refusal, tone: .critical)
+                        .accessibilityIdentifier("device.refusal")
                 }
             }
             if model.device.value != nil { cards } else if model.device.message == nil { ProgressView() }
@@ -236,7 +222,7 @@ struct DeviceView: View {
                 VStack(alignment: .leading, spacing: Spacing.xs) {
                     Text(verbatim: row.title).font(.headline)
                     Text(verbatim: row.detail).font(.subheadline)
-                    Text(verbatim: row.state).font(.subheadline.weight(.semibold))
+                    Text(verbatim: row.state).font(.factLabel)
                     ForEach(Array(row.notes.enumerated()), id: \.offset) { Text(verbatim: $1).font(.footnote) }
                     Button(tr("Add response note")) { Task { await model.addNote(to: row) } }
                         .secondaryAction()
