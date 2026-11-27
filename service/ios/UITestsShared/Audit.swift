@@ -11,8 +11,10 @@ extension XCUIApplication {
     @MainActor
     func audit() throws {
         let device = XCUIDevice.shared
-        defer { device.appearance = .light }
-        device.appearance = .light
+        // the appearance is set only when it changes: each set waits for the app to idle, and a screen that is
+        // redrawing (a countdown) may keep that wait from ending
+        defer { if device.appearance != .light { device.appearance = .light } }
+        if device.appearance != .light { device.appearance = .light }
         try audit(named: "light")
         device.appearance = .dark
         try audit(named: "dark")
@@ -41,10 +43,22 @@ extension XCUIApplication {
         if tabBar.exists, tabBar.frame.minY > window.minY {
             window.size.height = tabBar.frame.minY - Self.tabBarBlur - window.minY
         }
+        // a screen's action bar at its foot (the job screen) is opaque: what scrolls under it is hidden, as under the
+        // tab bar, and checked once scrolled above it; the bar's own buttons are checked where they are
+        let bar = descendants(matching: .any)["actionBar"].firstMatch
+        var barControls: [CGRect] = []
+        if bar.exists, bar.frame.minY > window.minY {
+            barControls = bar.buttons.allElementsBoundByIndex.map(\.frame)
+            window.size.height = min(window.height, bar.frame.minY - window.minY)
+        }
         try performAccessibilityAudit { issue in
             // an element the screen's edge cuts off is judged by the part that shows: its contrast is checked once it is
             // scrolled into view
-            if issue.auditType == .contrast, let frame = issue.element?.frame, !window.contains(frame) { return true }
+            if issue.auditType == .contrast, let frame = issue.element?.frame, !window.contains(frame),
+                !barControls.contains(where: { $0.contains(frame) })
+            {
+                return true
+            }
             // where it is, so a finding names the one of several elements with that label
             let element = issue.element.map { "\($0.elementType) '\($0.label)' (\($0.identifier)) at \($0.frame.integral)" } ?? "the screen"
             issues.append("\(issue.compactDescription): \(element) — \(issue.detailedDescription)")

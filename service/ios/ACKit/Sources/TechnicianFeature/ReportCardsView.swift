@@ -255,10 +255,15 @@ struct PartsCard: View {
                 }
             }
             if model.isEditable {
-                HStack {
-                    Button(tr("Add part")) { open(.part) }.secondaryAction().accessibilityIdentifier("report.part.add")
-                    Button(tr("Refrigerant")) { open(.refrigerant) }.secondaryAction().accessibilityIdentifier("report.refrigerant.add")
+                // one Add for both kinds of record
+                Menu {
+                    Button(tr("Add part")) { open(.part) }.accessibilityIdentifier("report.part.add")
+                    Button(tr("Refrigerant")) { open(.refrigerant) }.accessibilityIdentifier("report.refrigerant.add")
+                } label: {
+                    Label(tr("Add"), symbol: .increase)
                 }
+                .secondaryAction()
+                .accessibilityIdentifier("report.add")
                 Text(
                     verbatim: tr(
                         "Stock is deducted from your van when the report is accepted. Refrigerant amounts are kept per unit for leak-check and regulatory logs."

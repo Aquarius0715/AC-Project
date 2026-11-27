@@ -2,7 +2,8 @@ import ACKit
 import ACShared
 import SwiftUI
 
-/// Check in at site (DD-T13): the phone's fix and the unit's QR label, or a manual check-in with a reason.
+/// Check in at site (DD-T13): the phone's fix, taken as the sheet opens, and the unit's QR label; a manual check-in
+/// with a reason only when the label cannot be scanned or the phone has no fix.
 struct CheckInView: View {
     @Bindable var model: JobDetailModel
     let close: () -> Void
@@ -11,15 +12,11 @@ struct CheckInView: View {
     var body: some View {
         NavigationStack {
             Group {
-                Card(tr("How")) {
-                    HStack {
-                        method(.locationQr, tr("Location + unit QR"), id: "checkIn.method.qr")
-                        method(.manual, tr("Manual (reason)"), id: "checkIn.method.manual")
-                    }
-                }
                 if model.checkIn.method == .locationQr {
-                    Card(tr("Your location")) { location }
                     Card(tr("Scanned unit QR")) { qr }
+                    Card(tr("Your location")) { location }
+                    // the fallback, out of the way of the usual check-in
+                    method(.manual, tr("Manual (reason)"), id: "checkIn.method.manual")
                 } else {
                     Card(tr("Reason (required)")) {
                         TextField(tr("No GPS signal in the basement plant room"), text: $model.checkIn.reason, axis: .vertical)
@@ -28,6 +25,7 @@ struct CheckInView: View {
                             .accessibilityIdentifier("checkIn.reason")
                         error(.reason)
                     }
+                    method(.locationQr, tr("Location + unit QR"), id: "checkIn.method.qr")
                 }
                 Card {
                     Text(verbatim: tr("Arrival must be inside your work window. Checking in records the arrival and starts the work."))
@@ -48,19 +46,16 @@ struct CheckInView: View {
             .navigationTitle(Text(verbatim: tr("Check in at site")))
             .inlineTitle()
             .sheet(isPresented: $isScanning) { scanner }
+            // the fix is taken as the sheet opens: the technician has nothing to tap for it
+            .task { if model.checkIn.position == nil { await model.locate() } }
         }
     }
 
+    /// The switch to the other way of checking in, as a link-styled button.
     private func method(_ method: JobsCheckInInputMethod, _ title: String, id: String) -> some View {
-        Group {
-            if model.checkIn.method == method {
-                Button(title) { model.checkIn.method = method }.primaryAction()
-            } else {
-                Button(title) { model.checkIn.method = method }.secondaryAction()
-            }
-        }
-        .accessibilityIdentifier(id)
-        .accessibilityAddTraits(model.checkIn.method == method ? .isSelected : [])
+        Button(title) { model.checkIn.method = method }
+            .linkAction()
+            .accessibilityIdentifier(id)
     }
 
     @ViewBuilder private var location: some View {
@@ -68,6 +63,7 @@ struct CheckInView: View {
             if model.isLocating { tr("Locating…") } else if model.checkIn.position == nil { tr("Get my location") } else {
                 tr("Locate again")
             }
+        Text(verbatim: model.checkIn.positionHint).font(.footnote).accessibilityIdentifier("checkIn.positionHint")
         Button {
             Task { await model.locate() }
         } label: {
@@ -76,26 +72,26 @@ struct CheckInView: View {
         .secondaryAction()
         .disabled(model.isLocating)
         .accessibilityIdentifier("checkIn.locate")
-        Text(verbatim: model.checkIn.positionHint).font(.footnote).accessibilityIdentifier("checkIn.positionHint")
         error(.position)
     }
 
+    /// The camera first (on a phone that has one), the label's text below it for a label that cannot be scanned.
     @ViewBuilder private var qr: some View {
+        if QRScanner.isAvailable {
+            Button {
+                isScanning = true
+            } label: {
+                Label(tr("Scan"), symbol: .scan).frame(maxWidth: .infinity)
+            }
+            .secondaryAction()
+            .accessibilityIdentifier("checkIn.scan")
+        }
         // a field that grows: one line is clipped at the larger text sizes
         TextField(tr("Scan the unit’s QR label"), text: $model.checkIn.qr, axis: .vertical)
             .lineLimit(1...3)
             .textFieldStyle(.roundedBorder)
             .codeEntry()
             .accessibilityIdentifier("checkIn.qr")
-        if QRScanner.isAvailable {
-            Button {
-                isScanning = true
-            } label: {
-                Label(tr("Scan"), symbol: .scan)
-            }
-            .secondaryAction()
-            .accessibilityIdentifier("checkIn.scan")
-        }
         error(.qr)
     }
 

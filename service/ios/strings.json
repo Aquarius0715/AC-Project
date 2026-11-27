@@ -24,6 +24,11 @@
     "ja": "このアプリの位置情報はオフです — 「設定」で許可するか、このスイッチをオフにしてください。",
     "ms": "Lokasi dimatikan untuk aplikasi ini — benarkan dalam Tetapan, atau matikan ini."
   },
+  "More actions": {
+    "id": "Tindakan lainnya",
+    "ja": "その他の操作",
+    "ms": "Tindakan lain"
+  },
   "No connection — check the network and try again": {
     "id": "Tidak ada koneksi — periksa jaringan dan coba lagi",
     "ja": "接続できません — ネットワークを確認して、もう一度お試しください",

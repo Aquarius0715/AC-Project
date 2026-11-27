@@ -525,6 +525,52 @@ private struct FixedPosition: PositionSource {
         #expect(model.hasReport, "a submitted report is read")
     }
 
+    @Test func eachStateHasOnePrimaryStepAndTheRestInItsMenu() async throws {
+        let paused = TimeOnSite(
+            arrivedAt: "2026-09-27T01:10:00Z",
+            checkInMethod: .locationQr,
+            checkInReason: nil,
+            distanceMeters: 20,
+            startedAt: "2026-09-27T01:10:00Z",
+            pauses: [TimeOnSitePauses(from: "2026-09-27T01:20:00Z", to: nil)],
+            finishedAt: nil,
+            onSiteMinutes: nil
+        )
+        var (model, _) = try await loaded()
+        #expect(model.primaryStep == .accept && model.moreSteps == [.cantMake])
+        (model, _) = try await loaded { $0.assignment?.acknowledgement = .accepted }
+        #expect(model.primaryStep == .checkIn(enabled: true) && model.moreSteps.isEmpty)
+        (model, _) = try await loaded { $0.status = .reworkRequested }
+        #expect(model.primaryStep == .resumeRework(enabled: true))
+        (model, _) = try await loaded { $0.status = .inProgress }
+        #expect(model.primaryStep == .report && model.moreSteps == [.pause], "the report first, the pause in the menu")
+        (model, _) = try await loaded {
+            $0.status = .inProgress
+            $0.timeOnSite = paused
+        }
+        #expect(model.primaryStep == .resume && model.moreSteps == [.report], "paused: resuming first")
+        (model, _) = try await loaded {
+            $0.status = .inProgress
+            $0.timeOnSite = paused
+            $0.assignment?.scheduledEnd = "2026-09-27T01:30:00Z"
+        }
+        #expect(model.primaryStep == .report && model.moreSteps.isEmpty, "after the window: only the report to read")
+        (model, _) = try await loaded {
+            $0.status = .inProgress
+            $0.assignment?.scheduledEnd = "2026-09-27T01:30:00Z"
+        }
+        #expect(model.primaryStep == .report && model.moreSteps.isEmpty)
+        (model, _) = try await loaded {
+            $0.status = .submitted
+            $0.reportRefs = [ReportRef(reportId: "r1", reportVersion: 1)]
+        }
+        #expect(model.primaryStep == .report)
+        (model, _) = try await loaded { $0.assignment?.acknowledgement = .cantMake }
+        #expect(model.primaryStep == nil, "waiting for the coordinator: nothing to do")
+        let (unread, _) = self.model([])
+        #expect(unread.primaryStep == nil && unread.moreSteps.isEmpty, "nothing before the job is read")
+    }
+
     @Test func returnedWorkIsResumed() async throws {
         let rework = try detail { $0.status = .reworkRequested }
         let (model, transport) = try await loaded({ $0.status = .reworkRequested }, then: [try answer(rework), try job(), try unit])

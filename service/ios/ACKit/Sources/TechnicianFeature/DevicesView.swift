@@ -17,16 +17,10 @@ struct DevicesView: View {
                 if let message = model.devices.message { Card { Text(verbatim: message).accessibilityIdentifier("devices.message") } }
                 if let note = model.note { Card { Text(verbatim: note).accessibilityIdentifier("devices.note") } }
                 Card {
-                    HStack {
-                        ForEach(DeviceFilter.allCases, id: \.self) { filter in
-                            if model.filter == filter {
-                                Button(filter.label) { model.filter = filter }.primaryAction()
-                                    .accessibilityAddTraits(.isSelected)
-                            } else {
-                                Button(filter.label) { model.filter = filter }.secondaryAction()
-                            }
-                        }
+                    Picker(tr("Devices"), selection: $model.filter) {
+                        ForEach(DeviceFilter.allCases, id: \.self) { Text(verbatim: $0.label).tag($0) }
                     }
+                    .pickerStyle(.segmented)
                     .accessibilityIdentifier("devices.filters")
                 }
                 Card(tr("Devices")) {

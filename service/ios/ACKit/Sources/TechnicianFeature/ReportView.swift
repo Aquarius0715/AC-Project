@@ -55,6 +55,8 @@ struct ReportView: View {
         .inlineTitle()
         .hideTabBar()
         .task { await model.load() }
+        // leaving the report keeps its edits: the autosave's wait is not waited out
+        .onDisappear { Task { if model.isDirty { await model.save() } } }
         // a refusal is felt as well as read; no success haptic here: the draft saves itself every 20 s
         .sensoryFeedback(.error, trigger: model.refusal) { _, new in new != nil }
         .sheet(item: $shown) { photo in
@@ -245,16 +247,13 @@ struct ReportView: View {
                     StatusLabel.fieldError(issue.text)
                 }
             }
-            HStack {
-                Button(tr("Save draft")) { Task { await model.save() } }
-                    .secondaryAction()
-                    .disabled(model.isSending)
-                    .accessibilityIdentifier("report.save")
-                Button(tr("Submit report")) { if model.checkSubmit() { isConfirmingSubmit = true } }
-                    .primaryAction()
-                    .disabled(model.isSending)
-                    .accessibilityIdentifier("report.submit")
-            }
+            // no Save button: the draft saves itself 20 s after an edit, before the sign-off and the submit, and when the
+            // screen is left
+            Button(tr("Submit report")) { if model.checkSubmit() { isConfirmingSubmit = true } }
+                .frame(maxWidth: .infinity, minHeight: Size.minTap)
+                .primaryAction()
+                .disabled(model.isSending)
+                .accessibilityIdentifier("report.submit")
             Text(
                 verbatim: tr(
                     "Submitted versions become read-only. A report returned for rework continues as a new draft version. Saving again clears the sign-off."

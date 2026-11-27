@@ -28,6 +28,9 @@ public enum Symbol: String, CaseIterable, Sendable {
     case decrease = "minus"
     case increase = "plus"
     case disclosure = "chevron.right"
+    /// The menu of a screen's other actions, beside its primary button.
+    case more = "ellipsis.circle"
+    case history = "clock.arrow.circlepath"
 
     // the technician's work
     case alertEvidence = "exclamationmark.bubble"
