@@ -105,7 +105,7 @@ custom_rules:
   # in ACShared/DesignSystem and taken from there, so a change of one is made in one place
   sf_symbol_name:
     name: "SF Symbol by its meaning"
-    regex: '(systemName|systemImage):\s*"'
+    regex: '\b(systemName|systemImage):'
     excluded: 'ACShared/DesignSystem/'
     message: "name the symbol by its meaning: Image(symbol: .warning), Label(title, symbol: .photo) (Symbol.swift)"
     severity: error

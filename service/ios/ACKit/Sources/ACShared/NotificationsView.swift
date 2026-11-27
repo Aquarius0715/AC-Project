@@ -43,7 +43,7 @@ public struct NotificationsView: View {
                 }
             }
             .cardScreen()
-            .overlay { if case .loading = model.notifications { ProgressView() } }
+            .loadingOverlay(model.notifications.isLoading)
             .navigationTitle(Text(verbatim: tr("Notifications")))
             .inlineTitle()
             .refreshable { await model.load() }

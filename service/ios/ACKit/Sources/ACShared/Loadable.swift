@@ -17,6 +17,11 @@ public enum Loadable<Value: Sendable>: Sendable {
         }
     }
 
+    /// Whether the first read is still on its way (nothing to show yet).
+    public var isLoading: Bool {
+        if case .loading = self { true } else { false }
+    }
+
     /// The line of the refusal, if the last read failed.
     public var message: String? {
         if case let .failed(message, _) = self { message } else { nil }

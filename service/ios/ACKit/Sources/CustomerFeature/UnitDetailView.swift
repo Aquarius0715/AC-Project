@@ -15,7 +15,7 @@ struct UnitDetailView: View {
     var body: some View {
         Group {
             if let message = model.unit.message {
-                Text(verbatim: message).accessibilityIdentifier("unit.message")
+                Card { StatusLabel(message, tone: .critical).accessibilityIdentifier("unit.message") }
             }
             if let unit = model.unit.value {
                 overview(unit)
@@ -26,7 +26,9 @@ struct UnitDetailView: View {
         }
         .cardScreen()
         .hideTabBar()
-        .overlay { if case .loading = model.unit { ProgressView() } }
+        .loadingOverlay(model.unit.isLoading)
+        // the AC's answer to a send is felt as well as read (the system's haptics follow the user's settings)
+        .sensoryFeedback(trigger: model.outcome) { _, outcome in outcome.map { $0.isOk ? .success : .error } }
         .navigationTitle(Text(verbatim: model.unit.value?.displayName ?? ""))
         .inlineTitle()
         .refreshable { await model.load() }
@@ -55,11 +57,13 @@ struct UnitDetailView: View {
             }
             .accessibilityElement(children: .combine)
             if unit.connection == .offline {
-                Text(
-                    verbatim: tr(
+                StatusLabel(
+                    tr(
                         "This AC is offline. Remote actions are disabled until the connection returns. Last seen {when}.",
                         ["when": unit.lastSeenAt.map { Format.dateTime($0) } ?? "—"]
-                    )
+                    ),
+                    tone: .critical,
+                    symbol: .offline
                 )
             } else {
                 reading(tr("Room temperature (measured)"), unit, .temperature)
@@ -83,21 +87,31 @@ struct UnitDetailView: View {
 
     @ViewBuilder private var banners: some View {
         if model.isBlocked {
-            Text(verbatim: tr("Remote control is paused while HQ checks this AC’s restriction state. Try again later."))
-                .accessibilityIdentifier("banner.blocked")
+            Card {
+                StatusLabel(tr("Remote control is paused while HQ checks this AC’s restriction state. Try again later."), tone: .warn)
+                    .accessibilityIdentifier("banner.blocked")
+            }
         }
         switch model.restriction {
         case .powerOff:
-            Text(verbatim: tr("Service restriction active — payment-related: this AC is kept off until the release is confirmed."))
-                .accessibilityIdentifier("banner.restriction")
-        case .temperatureLimit:
-            Text(
-                verbatim: tr(
-                    "Cooling restriction active — payment-related: setpoints below {min} °C are unavailable until the release is confirmed.",
-                    ["min": Words.celsius(model.minimum)]
+            Card {
+                StatusLabel(
+                    tr("Service restriction active — payment-related: this AC is kept off until the release is confirmed."),
+                    tone: .critical
                 )
-            )
-            .accessibilityIdentifier("banner.restriction")
+                .accessibilityIdentifier("banner.restriction")
+            }
+        case .temperatureLimit:
+            Card {
+                StatusLabel(
+                    tr(
+                        "Cooling restriction active — payment-related: setpoints below {min} °C are unavailable until the release is confirmed.",
+                        ["min": Words.celsius(model.minimum)]
+                    ),
+                    tone: .warn
+                )
+                .accessibilityIdentifier("banner.restriction")
+            }
         case nil:
             EmptyView()
         }
@@ -195,11 +209,7 @@ struct UnitDetailView: View {
                 .font(.footnote)
                 .fixedSize(horizontal: false, vertical: true)
             if let hint = model.coolingHint {
-                Label {
-                    Text(verbatim: hint)
-                } icon: {
-                    Image(symbol: .info)
-                }.font(.footnote)
+                StatusLabel(hint, tone: .info).font(.footnote)
             }
         }
     }
@@ -208,13 +218,9 @@ struct UnitDetailView: View {
     /// the retry of changes a send did not take.
     @ViewBuilder private var pending: some View {
         if model.isSettling, !model.changes.isEmpty, !model.isDisabled, !model.isSending {
-            Label {
-                Text(verbatim: tr("Sending: {changes}", ["changes": model.changeSummary]))
-            } icon: {
-                Image(symbol: .sending)
-            }
-            .font(.footnote)
-            .accessibilityIdentifier("pending")
+            StatusLabel(tr("Sending: {changes}", ["changes": model.changeSummary]), tone: .info, symbol: .sending)
+                .font(.footnote)
+                .accessibilityIdentifier("pending")
         } else if model.isLeftBehind {
             // a send that was refused leaves its changes: they go again only when asked
             Button(tr("Try again")) { Task { await model.sendChanges() } }
@@ -229,19 +235,14 @@ struct UnitDetailView: View {
             WaitingText(seconds: model.waiting?.seconds ?? 30).id(model.waiting?.commandId)
         } else if let outcome = model.outcome {
             VStack(alignment: .leading, spacing: Spacing.s) {
-                Label {
-                    Text(verbatim: outcome.text)
-                } icon: {
-                    Image(systemName: outcome.isOk ? "checkmark.circle" : "exclamationmark.triangle")
-                }
-                .accessibilityIdentifier("outcome")
+                StatusLabel(outcome.text, tone: outcome.isOk ? .ok : .critical).accessibilityIdentifier("outcome")
                 if !outcome.undo.isEmpty {
                     Button(tr("Undo")) { Task { await model.undo() } }.secondaryAction().accessibilityIdentifier("outcome.undo")
                 }
             }
         }
         if model.isOffline {
-            Text(verbatim: tr("Controls disabled while offline")).font(.headline)
+            StatusLabel(tr("Controls disabled while offline"), tone: .critical, symbol: .offline).font(.headline)
         }
     }
 
@@ -267,7 +268,9 @@ struct UnitDetailView: View {
                     Label {
                         Text(verbatim: row.text)
                     } icon: {
-                        if row.isBad { Image(symbol: .failed).accessibilityLabel(Text(verbatim: tr("Failed"))) }
+                        if row.isBad {
+                            Image(symbol: .failed).foregroundStyle(Palette.critical).accessibilityLabel(Text(verbatim: tr("Failed")))
+                        }
                     }
                     Text(verbatim: row.when).font(.footnote)
                 }

@@ -144,6 +144,8 @@ import Testing
         #expect(failed.message == "The service is unavailable — try again shortly")
         #expect(Loadable<Int>.loading.value == nil)
         #expect(Loadable<Int>.loading.message == nil)
+        #expect(Loadable<Int>.loading.isLoading && !Loadable<Int>.loaded(1).isLoading)
+        #expect(!Loadable<Int>.failed(message: "x", last: nil).isLoading)
     }
 }
 
